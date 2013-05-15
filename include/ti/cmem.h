@@ -1,5 +1,35 @@
+/*
+ * Copyright (c) 2007-2013 Texas Instruments Incorporated - http://www.ti.com
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * *  Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * *  Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * *  Neither the name of Texas Instruments Incorporated nor the names of
+ *    its contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+ * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 /**
- * @file    cmem.h
+ * @file    ti/cmem.h
  * @brief   Describes the interface to the contiguous memory allocator.
  *
  * The cmem user interface library wraps file system calls to an associated
@@ -7,7 +37,7 @@
  * this library to succeed.
  *
  * The following is an example of installing the cmem kernel module:
- * 
+ *
  * @verbatim /sbin/insmod cmemk.ko pools=4x30000,2x500000 phys_start=0x0 phys_end=0x3000000 @endverbatim
  *     - phys_start and phys_end must be specified in hexadecimal format
  *     - phys_start is "inclusive" and phys_end is "exclusive", i.e.,
@@ -22,13 +52,13 @@
  * This particular command creates 2 pools. The first pool is created with 4
  * buffers of size 30000 bytes and the second pool is created with 2 buffers
  * of size 500000 bytes. The CMEM pool buffers start at 0x0 and end at
- * 0x2FFFFFF (max). 
+ * 0x2FFFFFF (max).
  *
  * There is also support for a 2nd contiguous memory block to be specified,
  * with all the same features supported for the 2nd block as with the 1st.
  * This 2nd block is specified with *_1 parameters.  The following example
  * expands upon the first example above:
- * 
+ *
  * @verbatim /sbin/insmod cmemk.ko pools=4x30000,2x500000 phys_start=0x0 phys_end=0x3000000
     pools_1=4x65536 phys_start_1=0x80000000 phys_end_1=0x80010000 @endverbatim
  *
@@ -103,33 +133,21 @@
  * Only when the last registered file descriptor frees a buffer (either
  * explictily, or by auto-cleanup) does a buffer actually get freed back to
  * the kernel module.
- *
- * Since the CMEM interface library doesn't use the GT tracing facility, there
- * is one configuration option available for the CMEM module to control
- * whether the debug or release interface library is used for building the
- * application.  This config parameter is named 'debug' and is of type bool,
- * and the default value is 'false'.
- *
- * The following line is an example of enabling usage of the debug interface
- * library:
- *     var cmem = xdc.useModule('ti.sdo.linuxutils.cmem.CMEM');
- *     cmem.debug = true;
- * This will enable "CMEM Debug" statements to be printed to stdout.
  */
 /**
- *  @defgroup   ti_sdo_linuxutils_cmem_CMEM  Contiguous Memory Manager
+ *  @defgroup   ti_CMEM  Contiguous Memory Manager
  *
  *  This is the API for the Contiguous Memory Manager.
  */
 
-#ifndef ti_sdo_linuxutils_cmem_CMEM_H
-#define ti_sdo_linuxutils_cmem_CMEM_H
+#ifndef ti_CMEM_H
+#define ti_CMEM_H
 
 #if defined (__cplusplus)
 extern "C" {
 #endif
 
-/** @ingroup    ti_sdo_linuxutils_cmem_CMEM */
+/** @ingroup    ti_CMEM */
 /*@{*/
 
 #define CMEM_VERSION    0x03000100U
