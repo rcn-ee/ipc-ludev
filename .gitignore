@@ -3,11 +3,9 @@
 # Linux stuff
 /autom4te.cache
 /aclocal.m4
-/build-aux
 /linuxutils-*
 /config.log
 /config.status
-/configure
 /libtool
 .deps/
 /Makefile
