@@ -150,7 +150,9 @@ extern "C" {
 /** @ingroup    ti_CMEM */
 /*@{*/
 
-#define CMEM_VERSION    0x03000100U
+#define CMEM_VERSION    0x04000000U
+
+#define MAX_POOLS 32
 
 /* ioctl cmd "flavors" */
 #define CMEM_WB				0x00010000
@@ -160,6 +162,7 @@ extern "C" {
 #define CMEM_CACHED			0x00080000  /**< allocated buffer is cached */
 #define CMEM_NONCACHED			0x00000000  /**< allocated buffer is not cached */
 #define CMEM_PHYS			0x00100000
+#define CMEM_CMA			0x00200000
 
 #define CMEM_IOCMAGIC			0x0000fe00
 
@@ -197,7 +200,7 @@ extern "C" {
  * CMEM_allocPool2(), CMEM_free().
  */
 typedef struct CMEM_AllocParams {
-    int type;		/**< either CMEM_HEAP or CMEM_POOL */
+    int type;		/**< either CMEM_HEAP, CMEM_POOL, or CMEM_CMA */
     int flags;		/**< either CMEM_CACHED or CMEM_NONCACHED */
     size_t alignment;	/**<
                          * only used for heap allocations, must be power of 2
@@ -207,7 +210,7 @@ typedef struct CMEM_AllocParams {
 extern CMEM_AllocParams CMEM_DEFAULTPARAMS;
 
 typedef struct CMEM_BlockAttrs {
-    unsigned long phys_base;
+    off_t phys_base;
     size_t size;
 } CMEM_BlockAttrs;
 
@@ -234,19 +237,19 @@ union CMEM_AllocUnion {
 	int blockid;
     } get_pool_inparams;	/**< */
     struct {			/**< */
-	unsigned long physp;
+	unsigned long long physp;
 	size_t size;
     } alloc_pool_outparams;	/**< */
     struct {			/**< */
-	unsigned long physp;
+	unsigned long long physp;
 	size_t size;
     } get_block_outparams;	/**< */
     struct {			/**< */
 	int poolid;
 	size_t size;
     } free_outparams;		/**< */
-    unsigned long physp;
-    unsigned long virtp;
+    unsigned long long physp;
+    void *virtp;
     size_t size;
     int poolid;
     int blockid;
@@ -351,7 +354,8 @@ void *CMEM_allocPool2(int blockid, int poolid, CMEM_AllocParams *params);
  * @param   size    The size of the buffer to allocate.
  * @param   params  Allocation parameters.
  *
- * @remarks Used to allocate memory from either a pool or the heap.
+ * @remarks Used to allocate memory from either a pool, the heap, or the CMA
+ *          global area.
  *          If doing a pool allocation, the pool that best fits the requested
  *          size will be selected.  Use CMEM_allocPool() to allocate from a
  *          specific pool.
@@ -378,7 +382,8 @@ void *CMEM_alloc(size_t size, CMEM_AllocParams *params);
  * @param   size    The size of the buffer to allocate.
  * @param   params  Allocation parameters.
  *
- * @remarks Used to allocate memory from either a pool or the heap.
+ * @remarks Used to allocate memory from either a pool, the heap, or the CMA
+ *          global area.
  *          If doing a pool allocation, the pool that best fits the requested
  *          size will be selected.  Use CMEM_allocPool() to allocate from a
  *          specific pool.
@@ -422,7 +427,7 @@ void *CMEM_alloc2(int blockid, size_t size, CMEM_AllocParams *params);
  * @sa CMEM_free()
  * @sa CMEM_unregister()
  */
-void *CMEM_registerAlloc(unsigned long physp);
+void *CMEM_registerAlloc(off_t physp);
 
 /**
  * @brief Free a buffer previously allocated with
@@ -481,7 +486,7 @@ int CMEM_unregister(void *ptr, CMEM_AllocParams *params);
  *
  * @pre Must have called CMEM_init()
  */
-unsigned long CMEM_getPhys(void *ptr);
+off_t CMEM_getPhys(void *ptr);
 
 /**
  * @brief Do a cache writeback of the block pointed to by @c ptr/@c size
@@ -552,7 +557,7 @@ int CMEM_getVersion(void);
  * @sa  CMEM_getBlockAttrs()
  * @sa  CMEM_getNumBlocks()
  */
-int CMEM_getBlock(unsigned long *pphys_base, size_t *psize);
+int CMEM_getBlock(off_t *pphys_base, size_t *psize);
 
 /**
  * @brief Retrieve extended memory block attributes from CMEM driver
@@ -575,7 +580,6 @@ int CMEM_getBlockAttrs(int blockid, CMEM_BlockAttrs *pattrs);
  * @brief Retrieve number of blocks configured into CMEM driver
  *
  * @param   pnblocks     Pointer to storage for holding number of blocks
- * @param   pattrs       Pointer to CMEM_BlockAttrs struct
  *
  * @return Success (0) or failure (-1).
  *

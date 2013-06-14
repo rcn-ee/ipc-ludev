@@ -59,7 +59,7 @@ CMEM_AllocParams CMEM_DEFAULTPARAMS = {
 #define __E(fmt, args...) fprintf(stderr, "CMEM Error: " fmt, ## args)
 
 struct block_struct {
-    unsigned long addr;
+    void *addr;
     size_t size;
 };
 
@@ -156,7 +156,7 @@ int CMEM_init(void)
 static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params)
 {
     union CMEM_AllocUnion allocDesc;
-    unsigned long physp;
+    off_t physp;
     void *userp;
     size_t size;
     unsigned int cmd;
@@ -172,10 +172,11 @@ static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params)
 	    poolid, rv);
         return NULL;
     }
-    physp = allocDesc.alloc_pool_outparams.physp;
+    physp = (off_t)allocDesc.alloc_pool_outparams.physp;
     size = allocDesc.alloc_pool_outparams.size;
 
-    __D("allocPool: allocated phys buffer %#lx, size %#x\n", physp, size);
+    __D("allocPool: allocated phys buffer %#llx, size %#x\n",
+        (unsigned long long)physp, size);
 
     /* Map the physical address to user space */
     userp = mmap(0,                       // Preferred start address
@@ -186,9 +187,9 @@ static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params)
                  physp);                  // The byte offset from fd
 
     if (userp == MAP_FAILED) {
-        __E("allocPool: Failed to mmap buffer at physical address %#lx\n",
-            physp);
-        __E("    Freeing phys buffer %#lx\n", physp);
+        __E("allocPool: Failed to mmap buffer at physical address %#llx\n",
+            (unsigned long long)physp);
+        __E("    Freeing phys buffer %#llx\n", (unsigned long long)physp);
         ioctl(cmem_fd, CMEM_IOCFREEPHYS | CMEM_IOCMAGIC , &physp);
         return NULL;
     }
@@ -219,7 +220,7 @@ static void *allocFromHeap(int blockid, size_t size, CMEM_AllocParams *params)
 {
     void *userp;
     union CMEM_AllocUnion allocDesc;
-    unsigned long physp;
+    off_t physp;
     unsigned int cmd;
     int rv;
 
@@ -237,9 +238,9 @@ static void *allocFromHeap(int blockid, size_t size, CMEM_AllocParams *params)
 	    rv);
         return NULL;
     }
-    physp = allocDesc.physp;
+    physp = (off_t)allocDesc.physp;
 
-    __D("allocHeap: allocated phys buffer %#lx\n", physp);
+    __D("allocHeap: allocated phys buffer %#llx\n", (unsigned long long)physp);
 
     /* Map the physical address to user space */
     userp = mmap(0,                       // Preferred start address
@@ -250,14 +251,61 @@ static void *allocFromHeap(int blockid, size_t size, CMEM_AllocParams *params)
                  physp);                  // The byte offset from fd
 
     if (userp == MAP_FAILED) {
-        __E("allocHeap: Failed to mmap buffer at physical address %#lx\n",
-            physp);
-        __E("    Freeing phys buffer %#lx\n", physp);
+        __E("allocHeap: Failed to mmap buffer at physical address %#llx\n",
+            (unsigned long long)physp);
+        __E("    Freeing phys buffer %#llx\n", (unsigned long long)physp);
         ioctl(cmem_fd, CMEM_IOCFREEHEAPPHYS | CMEM_IOCMAGIC, &physp);
         return NULL;
     }
 
     __D("allocHeap: mmap succeeded, returning virt buffer %p\n", userp);
+
+    return userp;
+}
+
+static void *allocFromCMA(size_t size, CMEM_AllocParams *params)
+{
+    void *userp;
+    union CMEM_AllocUnion allocDesc;
+    off_t physp;
+    unsigned int cmd;
+    int rv;
+
+    cmd = CMEM_IOCALLOCHEAP | CMEM_CMA | params->flags;
+    allocDesc.alloc_heap_inparams.size = size;
+    allocDesc.alloc_heap_inparams.align = params->alignment == 0 ?
+                                  1 : params->alignment;
+
+    rv = ioctl(cmem_fd, cmd | CMEM_IOCMAGIC, &allocDesc);
+    if (rv != 0) {
+        __E("allocFromCMA: ioctl %s failed: %d\n",
+	    cmd == (CMEM_IOCALLOCHEAP | CMEM_CMA) ?
+	           "CMEM_IOCALLOCCMA" : "CMEM_IOCALLOCCMACACHED",
+	    rv);
+        return NULL;
+    }
+    physp = (off_t)allocDesc.physp;
+
+    __D("allocFromCMA: allocated phys buffer %#llx\n",
+        (unsigned long long)physp);
+
+    /* Map the physical address to user space */
+    userp = mmap(0,                       // Preferred start address
+                 size,                    // Length to be mapped
+                 PROT_WRITE | PROT_READ,  // Read and write access
+                 MAP_SHARED,              // Shared memory
+                 cmem_fd,                 // File descriptor
+                 physp);                  // The byte offset from fd
+
+    if (userp == MAP_FAILED) {
+        __E("allocFromCMA: Failed to mmap buffer at physical address %#llx\n",
+            (unsigned long long)physp);
+        __E("    Freeing phys buffer %#llx\n", (unsigned long long)physp);
+        ioctl(cmem_fd, CMEM_IOCFREEHEAPPHYS | CMEM_IOCMAGIC, &physp);
+        return NULL;
+    }
+
+    __D("allocFromCMA: mmap succeeded, returning virt buffer %p\n", userp);
 
     return userp;
 }
@@ -277,7 +325,7 @@ static void *alloc(int blockid, size_t size, CMEM_AllocParams *params)
 
     __D("alloc: entered w/ size %#x, params - type %s, flags %s, align %#x%s\n",
         size,
-        params->type == CMEM_POOL ? "POOL" : "HEAP",
+        params->type == CMEM_POOL ? "POOL" : params->type == CMEM_HEAP ? "HEAP" : "CMA",
         params->flags & CMEM_CACHED ? "CACHED" : "NONCACHED",
         params->alignment,
         params == &CMEM_DEFAULTPARAMS ? " (default)" : "");
@@ -289,8 +337,11 @@ static void *alloc(int blockid, size_t size, CMEM_AllocParams *params)
     if (params->type == CMEM_POOL) {
 	return getAndAllocFromPool(blockid, size, params);
     }
-    else {
+    else if (params->type == CMEM_HEAP) {
 	return allocFromHeap(blockid, size, params);
+    }
+    else {
+	return allocFromCMA(size, params);
     }
 }
 
@@ -304,25 +355,25 @@ void *CMEM_alloc2(int blockid, size_t size, CMEM_AllocParams *params)
     return alloc(blockid, size, params);
 }
 
-void *CMEM_registerAlloc(unsigned long physp)
+void *CMEM_registerAlloc(off_t physp)
 {
     union CMEM_AllocUnion allocDesc;
     void *userp;
     size_t size;
     int rv;
 
-    allocDesc.physp = physp;
+    allocDesc.physp = (unsigned long long)physp;
     rv = ioctl(cmem_fd, CMEM_IOCREGUSER | CMEM_IOCMAGIC, &allocDesc);
     if (rv != 0) {
-        __E("registerAlloc: ioctl CMEM_IOCREGUSER failed for phys addr %#lx: %d\n",
-	    physp, rv);
+        __E("registerAlloc: ioctl CMEM_IOCREGUSER failed for phys addr %#llx: %d\n",
+	    (unsigned long long)physp, rv);
 
         return NULL;
     }
     size = allocDesc.size;
 
-    __D("registerAlloc: registered use of phys buffer %#lx, size %#x\n",
-        physp, size);
+    __D("registerAlloc: registered use of phys buffer %#llx, size %#x\n",
+        (unsigned long long)physp, size);
 
     /* Map the physical address to user space */
     userp = mmap(0,                       // Preferred start address
@@ -333,9 +384,10 @@ void *CMEM_registerAlloc(unsigned long physp)
                  physp);               // The byte offset from fd
 
     if (userp == MAP_FAILED) {
-        __E("registerAlloc: Failed to mmap buffer at physical address %#lx\n",
-            physp);
-        __E("    Unregistering use of phys buffer %#lx\n", physp);
+        __E("registerAlloc: Failed to mmap buffer at physical address %#llx\n",
+            (unsigned long long)physp);
+        __E("    Unregistering use of phys buffer %#llx\n",
+	    (unsigned long long)physp);
         ioctl(cmem_fd, CMEM_IOCFREEPHYS | CMEM_IOCMAGIC, &physp);
 
         return NULL;
@@ -385,14 +437,14 @@ int CMEM_free(void *ptr, CMEM_AllocParams *params)
 
     __D("free: entered w/ ptr %p, params - type %s%s\n",
         ptr,
-        params->type == CMEM_POOL ? "POOL" : "HEAP",
+        params->type == CMEM_POOL ? "POOL" : params->type == CMEM_HEAP ? "HEAP" : "CMA",
         params == &CMEM_DEFAULTPARAMS ? " (default)" : "");
 
     if (!validate_init()) {
 	return -1;
     }
 
-    freeDesc.virtp = (int)ptr;
+    freeDesc.virtp = ptr;
     cmd = CMEM_IOCFREE | params->type;
     if (ioctl(cmem_fd, cmd | CMEM_IOCMAGIC, &freeDesc) == -1) {
         __E("free: failed to free %#x\n", (unsigned int) ptr);
@@ -401,7 +453,7 @@ int CMEM_free(void *ptr, CMEM_AllocParams *params)
     size = freeDesc.free_outparams.size;
 
     __D("free: ioctl CMEM_IOCFREE%s succeeded, size %#x\n",
-        params->type == CMEM_POOL ? "POOL" : "HEAP", size);
+        params->type == CMEM_POOL ? "POOL" : params->type == CMEM_HEAP ? "HEAP" : "CMA", size);
 
     if (munmap(ptr, size) == -1) {
         __E("free: failed to munmap %#x\n", (unsigned int) ptr);
@@ -455,7 +507,7 @@ int CMEM_getPool2(int blockid, size_t size)
     return getPoolFromBlock(blockid, size);
 }
 
-unsigned long CMEM_getPhys(void *ptr)
+off_t CMEM_getPhys(void *ptr)
 {
     union CMEM_AllocUnion getDesc;
 
@@ -465,17 +517,17 @@ unsigned long CMEM_getPhys(void *ptr)
 	return 0;
     }
 
-    getDesc.virtp = (unsigned long)ptr;
+    getDesc.virtp = ptr;
     if (ioctl(cmem_fd, CMEM_IOCGETPHYS | CMEM_IOCMAGIC, &getDesc) == -1) {
         __E("getPhys: Failed to get physical address of %#x\n",
-            (unsigned int) ptr);
+            (unsigned int)ptr);
         return 0;
     }
 
-    __D("getPhys: exiting, ioctl CMEM_IOCGETPHYS succeeded, returning %#lx\n",
+    __D("getPhys: exiting, ioctl CMEM_IOCGETPHYS succeeded, returning %#llx\n",
         getDesc.physp);
 
-    return getDesc.physp;
+    return (off_t)getDesc.physp;
 }
 
 int CMEM_cacheWb(void *ptr, size_t size)
@@ -488,7 +540,7 @@ int CMEM_cacheWb(void *ptr, size_t size)
 	return -1;
     }
 
-    block.addr = (unsigned long)ptr;
+    block.addr = ptr;
     block.size = size;
     if (ioctl(cmem_fd, CMEM_IOCCACHEWB | CMEM_IOCMAGIC, &block) == -1) {
         __E("cacheWb: Failed to writeback %#x\n", (unsigned int) ptr);
@@ -511,7 +563,7 @@ int CMEM_cacheWbInv(void *ptr, size_t size)
 	return -1;
     }
 
-    block.addr = (unsigned long)ptr;
+    block.addr = ptr;
     block.size = size;
     if (ioctl(cmem_fd, CMEM_IOCCACHEWBINV | CMEM_IOCMAGIC, &block) == -1) {
         __E("cacheWbInv: Failed to writeback & invalidate %#x\n",
@@ -535,7 +587,7 @@ int CMEM_cacheInv(void *ptr, size_t size)
 	return -1;
     }
 
-    block.addr = (unsigned long)ptr;
+    block.addr = ptr;
     block.size = size;
     if (ioctl(cmem_fd, CMEM_IOCCACHEINV | CMEM_IOCMAGIC, &block) == -1) {
         __E("cacheInv: Failed to invalidate %#x\n", (unsigned int) ptr);
@@ -572,7 +624,7 @@ int CMEM_getVersion(void)
     return version;
 }
 
-static int getBlock(int blockid, unsigned long *pphys_base, size_t *psize)
+static int getBlock(int blockid, off_t *pphys_base, size_t *psize)
 {
     union CMEM_AllocUnion block;
     int rv;
@@ -592,16 +644,17 @@ static int getBlock(int blockid, unsigned long *pphys_base, size_t *psize)
 	return -1;
     }
 
-    *pphys_base = block.get_block_outparams.physp;
+    *pphys_base = (off_t)block.get_block_outparams.physp;
     *psize = block.get_block_outparams.size;
 
     __D("getBlock: exiting, ioctl CMEM_IOCGETBLOCK succeeded, "
-        "returning *pphys_base=0x%lx, *psize=0x%x\n", *pphys_base, *psize);
+        "returning *pphys_base=%#llx, *psize=%#x\n",
+        (unsigned long long)(*pphys_base), *psize);
 
     return 0;
 }
 
-int CMEM_getBlock(unsigned long *pphys_base, size_t *psize)
+int CMEM_getBlock(off_t *pphys_base, size_t *psize)
 {
     return getBlock(0, pphys_base, psize);
 }

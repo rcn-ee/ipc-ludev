@@ -32,7 +32,7 @@
 ##
 
 # additional include paths necessary to compile the library
-AM_CFLAGS = -I$(top_srcdir)/include -Wall @AM_CFLAGS@
+AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -I$(top_srcdir)/include -Wall @AM_CFLAGS@
 
 ###############################################################################
 # THE LIBRARIES TO BUILD

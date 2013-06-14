@@ -86,7 +86,7 @@ AMDEP_TRUE = @AMDEP_TRUE@
 AMTAR = @AMTAR@
 
 # additional include paths necessary to compile the program
-AM_CFLAGS = -I$(top_srcdir)/include -Wall @AM_CFLAGS@
+AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -I$(top_srcdir)/include -Wall @AM_CFLAGS@ 
 AM_LDFLAGS = @AM_LDFLAGS@
 AR = @AR@
 AUTOCONF = @AUTOCONF@

@@ -46,11 +46,128 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <errno.h>
 
 #include <ti/cmem.h>
 
 #define NUMHEAPPTRS 0x1000
 unsigned int *heap_ptrs[NUMHEAPPTRS];
+int nblocks;
+
+int writereadCMA(int size)
+{
+    int rv;
+    int i;
+    CMEM_AllocParams params;
+    char *heap_ptr;
+
+    printf("allocating write-read heap buffer from CMA memory block...\n");
+    params.type = CMEM_CMA;
+    params.flags = CMEM_NONCACHED;
+    params.alignment = 0;
+    heap_ptr = CMEM_alloc(size, &params);
+    if (heap_ptr == NULL) {
+	printf("...failed\n");
+	return -1;
+    }
+    else {
+	printf("...done, allocated buffer at virtp %p\n", heap_ptr);
+    }
+
+    printf("Performing write-read test on CMA buffer...\n");
+    for (i = 0; i < size; i++) {
+	heap_ptr[i] = i % 256;
+    }
+    for (i = 0; i < size; i++) {
+	if (heap_ptr[i] != (i % 256)) {
+	    printf("write-read error: read 0x%x, should be 0x%x\n",
+	           heap_ptr[i], i % 256);
+	    printf("Press ENTER to continue\n");
+	    getchar();
+
+	    break;
+	}
+    }
+    if (i == size) {
+	printf("...succeeded, press ENTER to continue\n");
+	getchar();
+    }
+
+    printf("calling CMEM_cacheInv(heap_ptr, size)...\n");
+    CMEM_cacheInv(heap_ptr, size);
+    printf("...done\n");
+
+    printf("freeing heap buffer...\n");
+    rv = CMEM_free(heap_ptr, &params);
+    if (rv < 0) {
+	printf("error freeing buffer\n");
+    }
+    printf("...done\n");
+
+    return 0;
+}
+
+void testCMA(int size)
+{
+    int rv;
+    int num_buffers;
+    int i;
+    CMEM_AllocParams params;
+
+    printf("allocating heap buffers from CMA memory block...\n");
+    printf("    (will end with expected failed allocation)\n");
+
+    num_buffers = 0;
+    params.type = CMEM_CMA;
+    params.flags = CMEM_NONCACHED;
+    params.alignment = 0;
+    while (num_buffers < NUMHEAPPTRS) {
+	heap_ptrs[num_buffers] = CMEM_alloc(size, &params);
+	if (heap_ptrs[num_buffers] == NULL) {
+	    break;
+	}
+	num_buffers++;
+    }
+    printf("...done, %d allocated\n", num_buffers);
+
+    printf("Press ENTER to continue\n");
+    getchar();
+
+    printf("freeing heap blocks...\n");
+    for (i = 0; i < num_buffers; i++) {
+	rv = CMEM_free(heap_ptrs[i], &params);
+	if (rv < 0) {
+	    printf("error freeing blocks\n");
+	    break;
+	}
+	heap_ptrs[i] = NULL;
+    }
+    printf("...done\n");
+
+    /* make sure we can still allocate num_buffers after freeing */
+    printf("allocating %d heap blocks...\n", num_buffers);
+    for (i = 0; i < num_buffers; i++) {
+	heap_ptrs[i] = CMEM_alloc(size, &params);
+	if (heap_ptrs[i] == NULL) {
+	    printf("error re-allocating %d heap blocks\n", num_buffers);
+	    break;
+	}
+    }
+    printf("...done, freeing heap blocks...\n");
+    for (i = 0; i < num_buffers; i++) {
+	rv = CMEM_free(heap_ptrs[i], &params);
+	if (rv < 0) {
+	    printf("error freeing blocks\n");
+	    break;
+	}
+    }
+    printf("...done\n");
+
+    if (num_buffers) {
+	writereadCMA(size);
+    }
+
+}
 
 void testHeap(int size, int block)
 {
@@ -60,6 +177,8 @@ void testHeap(int size, int block)
     CMEM_AllocParams params;
 
     printf("allocating heap buffers from CMEM memory block %d...\n", block);
+    printf("    (will end with expected failed allocation)\n");
+
     num_buffers = 0;
     params.type = CMEM_HEAP;
     params.flags = CMEM_NONCACHED;
@@ -73,7 +192,7 @@ void testHeap(int size, int block)
     }
     printf("...done, %d allocated\n", num_buffers);
 
-    printf("Press ENTER to continue (after 'cat /proc/cmem' if desired).\n");
+    printf("Press ENTER to continue\n");
     getchar();
 
     printf("freeing heap blocks...\n");
@@ -103,7 +222,6 @@ void testHeap(int size, int block)
 	    break;
 	}
     }
-
     printf("...done\n");
 }
 
@@ -113,10 +231,10 @@ void testCache(int size, int block)
     unsigned int *ptr1_cache = NULL;
     unsigned int *ptr1_dma = NULL;
     unsigned int *ptr2 = NULL;
-    unsigned long physp;
-    unsigned long physp_dma;
-    unsigned long physp_nocache;
-    unsigned long physp_cache;
+    off_t physp;
+    off_t physp_dma;
+    off_t physp_nocache;
+    off_t physp_cache;
     int poolid;
     int i, j;
     struct timeval start_tv, end_tv;
@@ -127,7 +245,7 @@ void testCache(int size, int block)
     printf("Allocating first noncached buffer.\n");
 
     /* First allocate a buffer from the pool that best fits */
-    ptr1_nocache = CMEM_alloc(size, NULL);
+    ptr1_nocache = CMEM_alloc2(block, size, NULL);
 
     if (ptr1_nocache == NULL) {
         fprintf(stderr, "Failed to allocate buffer of size %d\n", size);
@@ -146,8 +264,8 @@ void testCache(int size, int block)
         goto cleanup;
     }
 
-    printf("Physical address of allocated buffer is %#x.\n",
-           (unsigned int) physp_nocache);
+    printf("Physical address of allocated buffer is %#llx.\n",
+           (unsigned long long)physp_nocache);
 
     /* Write some data into this buffer */
     for (i=0; i < size / sizeof(int) ; i++) {
@@ -167,19 +285,19 @@ void testCache(int size, int block)
     }
 
     printf("Allocated buffer of size %d at address %#x.\n", size,
-           (unsigned int) ptr1_cache);
+           (unsigned int)ptr1_cache);
 
     /* Find out and print the physical address of this buffer */
     physp_cache = CMEM_getPhys(ptr1_cache);
 
     if (physp_cache == 0) {
         fprintf(stderr, "Failed to get physical address of buffer %#x\n",
-                (unsigned int) ptr1_cache);
+                (unsigned int)ptr1_cache);
         goto cleanup;
     }
 
-    printf("Physical address of allocated buffer is %#x.\n",
-           (unsigned int) physp_cache);
+    printf("Physical address of allocated buffer is %#llx.\n",
+           (unsigned long long)physp_cache);
 
     /* Write some data into this buffer */
     for (i = 0; i < size / sizeof(int); i++) {
@@ -189,7 +307,7 @@ void testCache(int size, int block)
     printf("Allocating noncached DMA source buffer.\n");
 
     /* Allocate a noncached buffer for the DMA source */
-    ptr1_dma = CMEM_alloc(size, NULL);
+    ptr1_dma = CMEM_alloc2(block, size, NULL);
 
     if (ptr1_dma == NULL) {
         fprintf(stderr, "Failed to allocate buffer of size %d\n", size);
@@ -197,19 +315,19 @@ void testCache(int size, int block)
     }
 
     printf("Allocated buffer of size %d at address %#x.\n", size,
-           (unsigned int) ptr1_dma);
+           (unsigned int)ptr1_dma);
 
     /* Find out and print the physical address of this buffer */
     physp_dma = CMEM_getPhys(ptr1_dma);
 
     if (physp_dma == 0) {
         fprintf(stderr, "Failed to get physical address of buffer %#x\n",
-                (unsigned int) ptr1_dma);
+                (unsigned int)ptr1_dma);
         goto cleanup;
     }
 
-    printf("Physical address of allocated buffer is %#x.\n",
-           (unsigned int) physp_dma);
+    printf("Physical address of allocated buffer is %#llx.\n",
+           (unsigned long long)physp_dma);
 
     /* Initialize DMA source buffer */
     for (i = 0; i < size / sizeof(int); i++) {
@@ -222,7 +340,8 @@ void testCache(int size, int block)
      */
     printf("Measuring R-M-W performance (cached should be quicker).\n");
     for (j = 0; j < 3; j++) {
-	printf("R-M-W noncached buffer %lx\n", physp_nocache);
+	printf("R-M-W noncached buffer %#llx\n",
+	       (unsigned long long)physp_nocache);
 	gettimeofday(&start_tv, NULL);
 	for (i = 0; i < (size / sizeof(int)); i += 1) {
 	    ptr1_nocache[i] += 1;
@@ -234,7 +353,7 @@ void testCache(int size, int block)
 	}
 	printf("  diff=%ld\n", diff);
 
-	printf("R-M-W cached buffer %lx\n", physp_cache);
+	printf("R-M-W cached buffer %#llx\n", (unsigned long long)physp_cache);
 	gettimeofday(&start_tv, NULL);
 	for (i = 0; i < (size / sizeof(int)); i += 1) {
 	    ptr1_cache[i] += 1;
@@ -258,7 +377,7 @@ void testCache(int size, int block)
     printf("wrote 0x%x to *ptr1_cache\n", bar);
     printf("post-inv *ptr1_cache=0x%x\n", *ptr1_cache);
 
-    printf("R-M-W cached buffer %lx\n", physp_cache);
+    printf("R-M-W cached buffer %#llx\n", (unsigned long long)physp_cache);
     gettimeofday(&start_tv, NULL);
     for (i = 0; i < (size / sizeof(int)); i += 1) {
 	ptr1_cache[i] += 1;
@@ -278,7 +397,7 @@ void testCache(int size, int block)
      */
     printf("Allocating second buffer.\n");
 
-    poolid = CMEM_getPool(size);
+    poolid = CMEM_getPool2(block, size);
 
     if (poolid == -1) {
         fprintf(stderr, "Failed to get a pool which fits size %d\n", size);
@@ -287,7 +406,7 @@ void testCache(int size, int block)
 
     printf("Got a pool (%d) that fits the size %d\n", poolid, size);
 
-    ptr2 = CMEM_allocPool(poolid, NULL);
+    ptr2 = CMEM_allocPool2(block, poolid, NULL);
 
     if (ptr2 == NULL) {
         fprintf(stderr, "Failed to allocate buffer of size %d\n", size);
@@ -295,19 +414,19 @@ void testCache(int size, int block)
     }
 
     printf("Allocated buffer of size %d at address %#x.\n", size,
-           (unsigned int) ptr2);
+           (unsigned int)ptr2);
 
     /* Find out and print the physical address of this buffer */
     physp = CMEM_getPhys(ptr2);
 
     if (physp == 0) {
         fprintf(stderr, "Failed to get physical address of buffer %#x\n",
-                (unsigned int) ptr2);
+                (unsigned int)ptr2);
         goto cleanup;
     }
 
-    printf("Physical address of allocated buffer is %#x.\n",
-           (unsigned int) physp);
+    printf("Physical address of allocated buffer is %#llx.\n",
+           (unsigned long long)physp);
 
     /* Write some data into this buffer */
     for (i=0; i < size / sizeof(int); i++) {
@@ -323,37 +442,37 @@ cleanup:
     if (ptr1_nocache != NULL) {
 	if (CMEM_free(ptr1_nocache, NULL) < 0) {
 	    fprintf(stderr, "Failed to free buffer at %#x\n",
-		    (unsigned int) ptr1_nocache);
+		    (unsigned int)ptr1_nocache);
 	}
 	printf("Successfully freed buffer at %#x.\n",
-	       (unsigned int) ptr1_nocache);
+	       (unsigned int)ptr1_nocache);
     }
 
     if (ptr1_cache != NULL) {
 	if (CMEM_free(ptr1_cache, &params) < 0) {
 	    fprintf(stderr, "Failed to free buffer at %#x\n",
-		    (unsigned int) ptr1_cache);
+		    (unsigned int)ptr1_cache);
 	}
 	printf("Successfully freed buffer at %#x.\n",
-	       (unsigned int) ptr1_cache);
+	       (unsigned int)ptr1_cache);
     }
 
     if (ptr1_dma != NULL) {
 	if (CMEM_free(ptr1_dma, NULL) < 0) {
 	    fprintf(stderr, "Failed to free buffer at %#x\n",
-		    (unsigned int) ptr1_dma);
+		    (unsigned int)ptr1_dma);
 	}
 	printf("Successfully freed buffer at %#x.\n",
-	       (unsigned int) ptr1_dma);
+	       (unsigned int)ptr1_dma);
     }
 
     if (ptr2 != NULL) {
 	if (CMEM_free(ptr2, NULL) < 0) {
 	    fprintf(stderr, "Failed to free buffer at %#x\n",
-		    (unsigned int) ptr2);
+		    (unsigned int)ptr2);
 	}
 	printf("Successfully freed buffer at %#x.\n",
-	       (unsigned int) ptr2);
+	       (unsigned int)ptr2);
     }
 }
 
@@ -362,13 +481,21 @@ int main(int argc, char *argv[])
     int size;
     int version;
     CMEM_BlockAttrs attrs;
+    int i;
 
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <Number of bytes to allocate>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
-    size = atoi(argv[1]);
+    errno = 0;
+    size = strtol(argv[1], NULL, 0);
+
+    if (errno) {
+	fprintf(stderr, "Bad argument ('%s'), strtol() set errno %d\n",
+	        argv[1], errno);
+        exit(EXIT_FAILURE);
+    }
 
     /* First initialize the CMEM module */
     if (CMEM_init() == -1) {
@@ -381,30 +508,41 @@ int main(int argc, char *argv[])
     version = CMEM_getVersion();
     if (version == -1) {
 	fprintf(stderr, "Failed to retrieve CMEM version\n");
+        exit(EXIT_FAILURE);
     }
     printf("CMEM version = 0x%x\n", version);
 
-    if (CMEM_getBlockAttrs(0, &attrs) == -1) {
-	fprintf(stderr, "Failed to retrieve CMEM memory block 0 bounds\n");
+    testCMA(size);
+
+    if (CMEM_getNumBlocks(&nblocks)) {
+	fprintf(stderr, "Failed to retrieve number of blocks\n");
+        exit(EXIT_FAILURE);
     }
-    printf("CMEM memory block 0: phys start = 0x%lx, size = 0x%x\n",
-           attrs.phys_base, attrs.size);
+    printf("\n# of CMEM blocks (doesn't include possible CMA global 'block'): %d\n", nblocks);
 
-    if (CMEM_getBlockAttrs(1, &attrs) == -1) {
-	fprintf(stderr, "Failed to retrieve CMEM memory block 1 bounds\n");
+    if (nblocks) {
+	for (i = 0; i < nblocks; i++) {
+	    if (CMEM_getBlockAttrs(i, &attrs) == -1) {
+		fprintf(stderr, "Failed to retrieve CMEM memory block %d bounds\n", i);
+	    }
+	    else {
+		printf("CMEM memory block %d: phys start = %#llx, size = %#x\n",
+		       i, (unsigned long long)attrs.phys_base, attrs.size);
+	    }
+
+	    testHeap(size, i);
+	    testCache(size, i);
+	}
     }
-    printf("CMEM memory block 1: phys start = 0x%lx, size = 0x%x\n",
-           attrs.phys_base, attrs.size);
+    else {
+	printf("    no physical block found, not performing block-based testing\n");
+    }
 
-    testHeap(size, 0);
-    testHeap(size, 1);
-
-    testCache(size, 0);
-    testCache(size, 1);
-
+    printf("\nexiting...\n");
     if (CMEM_exit() < 0) {
         fprintf(stderr, "Failed to finalize the CMEM module\n");
     }
+    printf("...test done\n");
 
     exit(EXIT_SUCCESS);
 }

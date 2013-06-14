@@ -50,7 +50,7 @@
 int main(int argc, char *argv[])
 {
     unsigned char *ptr, *orig;
-    unsigned long physp;
+    off_t physp;
     int i;
     int inc;
 
@@ -88,8 +88,8 @@ int main(int argc, char *argv[])
             goto cleanup;
         }
 
-        printf("virtual=%#x physical=%#x\n", (unsigned int) ptr,
-                                             (unsigned int) physp);
+        printf("virtual=%#x physical=%#llx\n", (unsigned int) ptr,
+                                               (unsigned long long) physp);
 
         ptr += inc;
     }
@@ -106,8 +106,8 @@ int main(int argc, char *argv[])
             goto cleanup;
         }
 
-        printf("virtual=%#x physical=%#x\n", (unsigned int) ptr,
-                                             (unsigned int) physp);
+        printf("virtual=%#x physical=%#llx\n", (unsigned int) ptr,
+                                               (unsigned long long) physp);
 
         ptr += inc;
     }
@@ -124,8 +124,8 @@ int main(int argc, char *argv[])
             goto cleanup;
         }
 
-        printf("virtual=%#x physical=%#x\n", (unsigned int) ptr,
-                                             (unsigned int) physp);
+        printf("virtual=%#x physical=%#llx\n", (unsigned int) ptr,
+                                               (unsigned long long) physp);
 
         ptr += inc;
     }
@@ -142,8 +142,8 @@ int main(int argc, char *argv[])
             goto cleanup;
         }
 
-        printf("virtual=%#x physical=%#x\n", (unsigned int) ptr,
-                                             (unsigned int) physp);
+        printf("virtual=%#x physical=%#llx\n", (unsigned int) ptr,
+                                               (unsigned long long) physp);
 
         ptr += inc;
     }
