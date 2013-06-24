@@ -39,38 +39,7 @@
 
 #include <linux/version.h>
 
-/*
- * The following macros control version-dependent code:
- * USE_CLASS_SIMPLE - #define if Linux version contains "class_simple*",
- *    otherwise "class*" or "device*" is used (see USE_CLASS_DEVICE usage).
- * USE_CLASS_DEVICE - #define if Linux version contains "class_device*",
- *    otherwise "device*" or "class_simple*" is used (see USE_CLASS_SIMPLE
- *    usage).
- * If neither USE_CLASS_SIMPLE nor USE_CLASS_DEVICE is set, there is further
- *    kernel version checking embedded in the module init & exit functions.
- */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26)
-
-#undef USE_CLASS_DEVICE
-#undef USE_CLASS_SIMPLE
-
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)
-
-#define USE_CLASS_DEVICE
-#undef USE_CLASS_SIMPLE
-
-#else  /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18) */
-
-#define USE_CLASS_SIMPLE
-#undef USE_CLASS_DEVICE
-
-#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18) */
-
 #include <ti/cmem.h>
-
-/*
- * Poor man's config params
- */
 
 /*
  * USE_MMAPSEM means acquire/release current->mm->mmap_sem around calls
@@ -114,10 +83,6 @@
 
 static struct vm_struct *ioremap_area;
 static unsigned int block_flags[NBLOCKS] = {0, 0};
-static void *block_virtp[NBLOCKS] = {0, 0};
-static void *block_virtend[NBLOCKS] = {0, 0};
-/* block_virtoff can be negative, don't declare it 'unsigned' */
-static long long block_virtoff[NBLOCKS] = {0, 0};
 static unsigned long long block_start[NBLOCKS] = {0, 0};
 static unsigned long long block_end[NBLOCKS] = {0, 0};
 static unsigned long block_avail_size[NBLOCKS] = {0, 0};
@@ -129,11 +94,7 @@ static struct proc_dir_entry *cmem_proc_entry;
 static atomic_t reference_count = ATOMIC_INIT(0);
 static unsigned int version = CMEM_VERSION;
 
-#ifdef USE_CLASS_SIMPLE
-static struct class_simple *cmem_class;
-#else
 static struct class *cmem_class;
-#endif
 
 /* Register the module parameters. */
 MODULE_PARM_DESC(phys_start, "\n\t\t Start Address for CMEM Pool Memory");
@@ -192,7 +153,7 @@ typedef struct pool_buffer {
     int id;
     phys_addr_t physp;
     int flags;			/* CMEM_CACHED or CMEM_NONCACHED or CMEM_CMA */
-    void *kvirtp;		/* used only for heap-based allocs */
+    void *kvirtp;		/* used only for CMA-based allocs */
     size_t size;		/* used only for heap-based allocs */
 } pool_buffer;
 
@@ -254,15 +215,15 @@ static struct file_operations cmem_fxns = {
  * HeapMem compatibility stuff
  */
 typedef struct HeapMem_Header {
-    struct HeapMem_Header *next;
-    unsigned long size;
+    phys_addr_t next;
+    size_t size;
 } HeapMem_Header;
 
 #define ALLOCRUN 0
 #define DRYRUN 1
 
-void *HeapMem_alloc(int bi, size_t size, size_t align, int dryrun);
-void HeapMem_free(int bi, void *block, size_t size);
+phys_addr_t HeapMem_alloc(int bi, size_t size, size_t align, int dryrun);
+void HeapMem_free(int bi, phys_addr_t block, size_t size);
 
 /*
  * Heap configuration stuff
@@ -279,19 +240,49 @@ void HeapMem_free(int bi, void *block, size_t size);
 static int heap_pool[NBLOCKS + 1] = {-1, -1, 0};
 
 static unsigned long heap_size[NBLOCKS] = {0, 0};
-static void *heap_virtp[NBLOCKS] = {0, 0};
+static phys_addr_t heap_physp[NBLOCKS] = {0, 0};
 static HeapMem_Header heap_head[NBLOCKS] = {
     {
-	NULL,	/* next */
+	0,	/* next */
 	0	/* size */
     },
 /* cut-and-paste below as part of adding support for more than 2 blocks */
     {
-	NULL,	/* next */
+	0,	/* next */
 	0	/* size */
     },
 /* cut-and-paste above as part of adding support for more than 2 blocks */
 };
+
+static int map_header(void **vaddrp, phys_addr_t physp, struct vm_struct **vm)
+{
+    unsigned long vaddr;
+
+    *vm = __get_vm_area(PAGE_SIZE, VM_IOREMAP, VMALLOC_START, VMALLOC_END);
+    if (!*vm) {
+	__E("__get_vm_area() failed\n");
+
+	return -ENOMEM;
+    }
+
+    vaddr = (unsigned long)(*vm)->addr;
+    ioremap_page_range((unsigned long)vaddr, (unsigned long)vaddr + PAGE_SIZE,
+                       physp, PAGE_KERNEL);
+    *vaddrp = (*vm)->addr;
+
+    __D("map_header: ioremap_page_range(%#llx, %#lx)=0x%p\n",
+        physp, PAGE_SIZE, *vaddrp);
+
+    return 0;
+}
+
+static void unmap_header(void *vaddr, struct vm_struct *vm)
+{
+    __D("unmap_header: unmap_kernel_page_rage(0x%p, %#lx)\n", vaddr, PAGE_SIZE);
+
+    unmap_kernel_range_noflush((unsigned long)vaddr, PAGE_SIZE);
+    free_vm_area(vm);
+}
 
 /*
  *  ======== HeapMem_alloc ========
@@ -313,10 +304,18 @@ static HeapMem_Header heap_head[NBLOCKS] = {
  *    2. Have a size that is a multiple of HEAP_ALIGN
  *
  */
-void *HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
+phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
 {
-    HeapMem_Header *prevHeader, *newHeader, *curHeader;
-    char *allocAddr;
+    struct vm_struct *curHeader_vm_area;
+    struct vm_struct *prevHeader_vm_area;
+    struct vm_struct *newHeader_vm_area;
+    HeapMem_Header *curHeader;
+    HeapMem_Header *prevHeader;
+    HeapMem_Header *newHeader;
+    phys_addr_t curHeaderPhys;
+    phys_addr_t prevHeaderPhys = 0;
+    phys_addr_t newHeaderPhys;
+    phys_addr_t allocAddr;
     size_t curSize, adjSize;
     size_t remainSize; /* free memory after allocated memory      */
     size_t adjAlign, offset;
@@ -355,22 +354,21 @@ void *HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
 //    key = Gate_enterModule();
 
     /*
-     *  The block will be allocated from curHeader. Maintain a pointer to
-     *  prevHeader so prevHeader->next can be updated after the alloc.
+     * The block will be allocated from curHeader. Maintain a pointer to
+     * prevHeader so prevHeader->next can be updated after the alloc.
      */
-    prevHeader  = &heap_head[bi];
-    curHeader = prevHeader->next;
+    curHeaderPhys = heap_head[bi].next;
 
     /* Loop over the free list. */
-    while (curHeader != NULL) {
-
+    while (curHeaderPhys != 0) {
+	map_header((void **)&curHeader, curHeaderPhys, &curHeader_vm_area);
         curSize = curHeader->size;
 
         /*
          *  Determine the offset from the beginning to make sure
          *  the alignment request is honored.
          */
-        offset = (unsigned long)curHeader & (adjAlign - 1);
+        offset = (unsigned long)curHeaderPhys & (adjAlign - 1);
         if (offset) {
             offset = adjAlign - offset;
         }
@@ -382,12 +380,11 @@ void *HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
 
         /* big enough? */
         if (curSize >= (adjSize + offset)) {
-
             /* Set the pointer that will be returned. Alloc from front */
-            allocAddr = (char *)((unsigned long)curHeader + offset);
+            allocAddr = curHeaderPhys + offset;
 
 	    if (dryrun) {
-		return ((void *)allocAddr);
+		return allocAddr;
 	    }
 
             /*
@@ -401,6 +398,17 @@ void *HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
             Assert_isTrue(((remainSize & (HEAP_ALIGN - 1)) == 0), NULL);
 #endif
 
+	    if (remainSize) {
+		newHeaderPhys = allocAddr + adjSize;
+		map_header((void **)&newHeader, newHeaderPhys,
+		           &newHeader_vm_area);
+
+		newHeader->next = curHeader->next;
+		newHeader->size = remainSize;
+
+		unmap_header(newHeader, newHeader_vm_area);
+	    }
+
             /*
              *  If there is memory at the beginning (due to alignment
              *  requirements), maintain it in the list.
@@ -411,7 +419,6 @@ void *HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
              *  maintaining the requirement.
              */
             if (offset) {
-
                 /* Adjust the curHeader size accordingly */
                 curHeader->size = offset;
 
@@ -421,11 +428,7 @@ void *HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
                  *        it is safe.
                  */
                 if (remainSize) {
-                    newHeader = (HeapMem_Header *)
-                        ((unsigned long)allocAddr + adjSize);
-                    newHeader->next = curHeader->next;
-                    newHeader->size = remainSize;
-                    curHeader->next = newHeader;
+                    curHeader->next = newHeaderPhys;
                 }
             }
             else {
@@ -435,16 +438,24 @@ void *HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
                  *  Note: no need to coalesce and we have HeapMem locked so
                  *        it is safe.
                  */
+		if (prevHeaderPhys != 0) {
+		    map_header((void **)&prevHeader, prevHeaderPhys,
+		               &prevHeader_vm_area);
+		}
+		else {
+		    prevHeader = &heap_head[bi];
+		}
+
                 if (remainSize) {
-                    newHeader = (HeapMem_Header *)
-                        ((unsigned long)allocAddr + adjSize);
-                    newHeader->next  = curHeader->next;
-                    newHeader->size  = remainSize;
-                    prevHeader->next = newHeader;
+                    prevHeader->next = newHeaderPhys;
                 }
                 else {
                     prevHeader->next = curHeader->next;
                 }
+
+		if (prevHeader != &heap_head[bi]) {
+		    unmap_header(prevHeader, prevHeader_vm_area);
+		}
             }
 
 /*
@@ -453,12 +464,16 @@ void *HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
  */
 //            Gate_leaveModule(key);
 
+	    unmap_header(curHeader, curHeader_vm_area);
+
             /* Success, return the allocated memory */
-            return ((void *)allocAddr);
+            return allocAddr;
         }
         else {
-            prevHeader = curHeader;
-            curHeader = curHeader->next;
+	    prevHeaderPhys = curHeaderPhys;
+	    curHeaderPhys = curHeader->next;
+
+	    unmap_header(curHeader, curHeader_vm_area);
         }
     }
 
@@ -468,20 +483,25 @@ void *HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
  */
 //    Gate_leaveModule(key);
 
-    return (NULL);
+    return 0;
 }
 
 /*
  *  ======== HeapMem_free ========
  */
-void HeapMem_free(int bi, void *addr, size_t size)
+void HeapMem_free(int bi, phys_addr_t block, size_t size)
 {
 //    long key;
-    HeapMem_Header *curHeader, *newHeader, *nextHeader;
+    struct vm_struct *curHeader_vm_area;
+    struct vm_struct *newHeader_vm_area;
+    struct vm_struct *nextHeader_vm_area;
+    HeapMem_Header *curHeader;
+    HeapMem_Header *newHeader;
+    HeapMem_Header *nextHeader;
+    phys_addr_t curHeaderPhys = 0;
+    phys_addr_t newHeaderPhys;
+    phys_addr_t nextHeaderPhys;
     size_t offset;
-
-    /* obj->head never changes, doesn't need Gate protection. */
-    curHeader = &heap_head[bi];
 
     /* Restore size to actual allocated size */
     if ((offset = size & (HEAP_ALIGN - 1)) != 0) {
@@ -494,43 +514,63 @@ void HeapMem_free(int bi, void *addr, size_t size)
  */
 //    key = Gate_enterModule();
 
-    newHeader = (HeapMem_Header *)addr;
-    nextHeader = curHeader->next;
+    newHeaderPhys = block;
+    nextHeaderPhys = heap_head[bi].next;
 
     /* Go down freelist and find right place for buf */
-    while (nextHeader != NULL && nextHeader < newHeader) {
-        curHeader = nextHeader;
-        nextHeader = nextHeader->next;
+    while (nextHeaderPhys != 0 && nextHeaderPhys < newHeaderPhys) {
+	map_header((void **)&nextHeader, nextHeaderPhys, &nextHeader_vm_area);
+
+        curHeaderPhys = nextHeaderPhys;
+        nextHeaderPhys = nextHeader->next;
+
+	unmap_header(nextHeader, nextHeader_vm_area);
     }
 
-    newHeader->next = nextHeader;
+    map_header((void **)&newHeader, newHeaderPhys, &newHeader_vm_area);
+
+    if (curHeaderPhys != 0) {
+	map_header((void **)&curHeader, curHeaderPhys, &curHeader_vm_area);
+    }
+    else {
+	curHeader = &heap_head[bi];
+    }
+
+    newHeader->next = nextHeaderPhys;
     newHeader->size = size;
-    curHeader->next = newHeader;
+    curHeader->next = newHeaderPhys;
 
     /* Join contiguous free blocks */
     /* Join with upper block */
-    if ((nextHeader != NULL) &&
-        (((unsigned long)newHeader + size) == (unsigned long)nextHeader)) {
+    if (nextHeaderPhys != 0 && (newHeaderPhys + size) == nextHeaderPhys) {
+	map_header((void **)&nextHeader, nextHeaderPhys, &nextHeader_vm_area);
+
         newHeader->next = nextHeader->next;
         newHeader->size += nextHeader->size;
+
+	unmap_header(nextHeader, nextHeader_vm_area);
     }
 
     /*
-     *  Join with lower block. Make sure to check to see if not the
-     *  first block.
+     * Join with lower block. Make sure to check to see if not the
+     * first block.
      */
-    if ((curHeader != &heap_head[bi]) &&
-        (((unsigned long)curHeader + curHeader->size) == (unsigned long)newHeader)) {
-        curHeader->next = newHeader->next;
-        curHeader->size += newHeader->size;
+    if (curHeader != &heap_head[bi]) {
+        if ((curHeaderPhys + curHeader->size) == newHeaderPhys) {
+	    curHeader->next = newHeader->next;
+	    curHeader->size += newHeader->size;
+	}
+
+	unmap_header(curHeader, curHeader_vm_area);
     }
+
+    unmap_header(newHeader, newHeader_vm_area);
 
 /*
  * See above comment on Gate_enterModule for an explanation of why we
  * don't use the "gate".
  */
 //    Gate_leaveModule(key);
-
 }
 
 /* Traverses the page tables and translates a virtual adress to a physical. */
@@ -540,18 +580,6 @@ static phys_addr_t get_phys(void *virtp)
     phys_addr_t physp = ~(0LL);
     struct mm_struct *mm = current->mm;
     struct vm_area_struct *vma;
-    int bi;
-
-    /* For CMEM block kernel addresses */
-    for (bi = 0; bi < NBLOCKS; bi++) {
-	if (virtp >= block_virtp[bi] && virtp < block_virtend[bi]) {
-	    physp = block_virtoff[bi] + virt;
-	    __D("get_phys: block_virtoff[%d](%#llx) translated kernel 0x%p to %#llx\n",
-		bi, block_virtoff[bi], virtp, (unsigned long long)physp);
-
-	    return physp;
-	}
-    }
 
     /* For kernel direct-mapped memory, take the easy way */
     if (virt >= PAGE_OFFSET) {
@@ -595,9 +623,9 @@ static phys_addr_t get_phys(void *virtp)
 }
 
 /* Allocates space from the top "highmem" contiguous buffer for pool buffer. */
-static void *alloc_pool_buffer(int bi, unsigned int size)
+static phys_addr_t alloc_pool_buffer(int bi, unsigned int size)
 {
-    void *virtp;
+    phys_addr_t physp;
 
     __D("alloc_pool_buffer: Called for size %u\n", size);
 
@@ -605,19 +633,20 @@ static void *alloc_pool_buffer(int bi, unsigned int size)
         __D("alloc_pool_buffer: Fits req %#x < avail: %#lx\n",
             size, block_avail_size[bi]);
         block_avail_size[bi] -= size;
-        virtp = block_virtp[bi] + block_avail_size[bi];
+        physp = block_start[bi] + block_avail_size[bi];
 
         __D("alloc_pool_buffer: new available block size is %#lx\n",
             block_avail_size[bi]);
 
-        __D("alloc_pool_buffer: returning allocated buffer at 0x%p\n", virtp);
+        __D("alloc_pool_buffer: returning allocated buffer at %#llx\n",
+	    (unsigned long long)physp);
 
-        return virtp;
+        return physp;
     }
 
     __E("Failed to find a big enough free block\n");
 
-    return NULL;
+    return 0;
 }
 
 
@@ -981,13 +1010,13 @@ static int cmem_proc_open(struct inode *inode, struct file *file)
 }
 
 /* Allocate a contiguous memory pool. */
-static int alloc_pool(int bi, int idx, int num, int reqsize, void **virtpRet)
+static int alloc_pool(int bi, int idx, int num, int reqsize, phys_addr_t *physpRet)
 {
     struct pool_buffer *entry;
     struct list_head *freelistp = &p_objs[bi][idx].freelist;
     struct list_head *busylistp = &p_objs[bi][idx].busylist;
     int size = PAGE_ALIGN(reqsize);
-    void *virtp;
+    phys_addr_t physp;
     int i;
 
     __D("Allocating %d buffers of size %d (requested %d)\n",
@@ -1008,9 +1037,9 @@ static int alloc_pool(int bi, int idx, int num, int reqsize, void **virtpRet)
             return -ENOMEM;
         }
 
-        virtp = alloc_pool_buffer(bi, size);
+        physp = alloc_pool_buffer(bi, size);
 
-        if (virtp == 0) {
+        if (physp == 0) {
             __E("alloc_pool failed to get contiguous area of size %d\n",
                 size);
 
@@ -1025,16 +1054,16 @@ static int alloc_pool(int bi, int idx, int num, int reqsize, void **virtpRet)
         }
 
         entry->id = i;
-        entry->physp = get_phys(virtp);
+        entry->physp = physp;
         entry->size = size;
         INIT_LIST_HEAD(&entry->users);
 
-        if (virtpRet) {
-            *virtpRet++ = virtp;
+        if (physpRet) {
+            *physpRet++ = physp;
         }
 
-        __D("Allocated buffer %d, virtual 0x%p and physical %#llx and size %d\n",
-            entry->id, virtp, (unsigned long long)entry->physp, size);
+        __D("Allocated buffer %d, physical %#llx and size %#x\n",
+            entry->id, (unsigned long long)entry->physp, size);
 
         list_add_tail(&entry->element, freelistp);
     }
@@ -1108,10 +1137,12 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 		    bi, NBLOCKS);
 		return -EINVAL;
 	    }
-	    if (heap_pool[bi] == -1) {
+	    if (bi < NBLOCKS && heap_pool[bi] == -1) {
 		__E("ioctl: no heap available in block %d\n", bi);
 		return -EINVAL;
 	    }
+
+	    pool = heap_pool[bi];
 
 	    entry = kmalloc(sizeof(struct pool_buffer), GFP_KERNEL);
 	    if (!entry) {
@@ -1126,13 +1157,14 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 
 	    if (cmd & CMEM_CMA) {
 		virtp = dma_alloc_coherent(NULL, size, &dma, GFP_KERNEL);
+
 		physp = dma;
+		entry->kvirtp = virtp;
 	    }
 	    else {
-		virtp = HeapMem_alloc(bi, size, align, ALLOCRUN);
-		if (virtp) {
-		    physp = get_phys(virtp);
-		}
+		physp = HeapMem_alloc(bi, size, align, ALLOCRUN);
+		/* set only for test just below here */
+		virtp = (void *)(unsigned int)physp;
 	    }
 
 	    if (virtp == NULL) {
@@ -1146,14 +1178,13 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 	    }
 
 	    entry->dma = dma;
-	    entry->id = heap_pool[bi];
+	    entry->id = pool;
 	    entry->physp = physp;
-	    entry->kvirtp = virtp;
 	    entry->size = size;
 	    entry->flags = cmd & ~CMEM_IOCCMDMASK;
 	    INIT_LIST_HEAD(&entry->users);
 
-            busylistp = &p_objs[bi][heap_pool[bi]].busylist;
+            busylistp = &p_objs[bi][pool].busylist;
 	    list_add_tail(&entry->element, busylistp);
 
 	    user = kmalloc(sizeof(struct registered_user), GFP_KERNEL);
@@ -1182,12 +1213,18 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
             }
 
 	    pool = allocDesc.alloc_pool_inparams.poolid;
-	    bi = allocDesc.alloc_pool_inparams.blockid;
+
+	    if (cmd & CMEM_CMA) {
+		bi = NBLOCKS;
+	    }
+	    else {
+		bi = allocDesc.alloc_pool_inparams.blockid;
+	    }
 
             __D("ALLOC%s ioctl received on pool %d for memory block %d\n",
 	        cmd & CMEM_CACHED ? "CACHED" : "", pool, bi);
 
-	    if (bi >= NBLOCKS) {
+	    if (bi > NBLOCKS) {
 		__E("ioctl: invalid block id %d, must be < %d\n",
 		    bi, NBLOCKS);
 		return -EINVAL;
@@ -1199,21 +1236,21 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
                 return -EINVAL;
             }
 
-            freelistp = &p_objs[bi][pool].freelist;
             busylistp = &p_objs[bi][pool].busylist;
+	    freelistp = &p_objs[bi][pool].freelist;
 
 	    if (mutex_lock_interruptible(&cmem_mutex)) {
 		return -ERESTARTSYS;
 	    }
 
-            e = freelistp->next;
-            if (e == freelistp) {
-                __E("ALLOC%s: No free buffers available for pool %d\n",
+	    e = freelistp->next;
+	    if (e == freelistp) {
+		__E("ALLOC%s: No free buffers available for pool %d\n",
 		    cmd & CMEM_CACHED ? "CACHED" : "", pool);
-                mutex_unlock(&cmem_mutex);
-                return -ENOMEM;
-            }
-            entry = list_entry(e, struct pool_buffer, element);
+		mutex_unlock(&cmem_mutex);
+		return -ENOMEM;
+	    }
+	    entry = list_entry(e, struct pool_buffer, element);
 
 	    allocDesc.alloc_pool_outparams.physp = entry->physp;
 	    allocDesc.alloc_pool_outparams.size = p_objs[bi][pool].size;
@@ -1351,7 +1388,7 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 			                      entry->kvirtp, entry->dma);
 			}
 			else {
-			    HeapMem_free(bi, entry->kvirtp, entry->size);
+			    HeapMem_free(bi, entry->physp, entry->size);
 			}
 			list_del(e);
 			kfree(entry);
@@ -1498,8 +1535,8 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 		if (useHeapIfPoolUnavailable) {
 		    /* no pool buffer available, try heap */
 
-		    virtp = HeapMem_alloc(bi, reqsize, HEAP_ALIGN, DRYRUN);
-		    if (virtp != NULL) {
+		    physp = HeapMem_alloc(bi, reqsize, HEAP_ALIGN, DRYRUN);
+		    if (physp != 0) {
 			/*
 			 * Indicate heap pool with magic negative value.
 			 * -1 indicates no pool and no heap.
@@ -1757,6 +1794,7 @@ static int mmap(struct file *filp, struct vm_area_struct *vma)
 	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff, size,
 	                    vma->vm_page_prot)) {
 	    __E("mmap: failed remap_pfn_range\n");
+
 	    return -EAGAIN;
 	}
 
@@ -1875,7 +1913,7 @@ static int release(struct inode *inode, struct file *filp)
 			                      entry->kvirtp, entry->dma);
 			}
 			else {
-			    HeapMem_free(bi, entry->kvirtp, entry->size);
+			    HeapMem_free(bi, entry->physp, entry->size);
 			}
 			list_del(e);
 			kfree(entry);
@@ -1929,6 +1967,7 @@ int __init cmem_init(void)
     char *pend[NBLOCKS];
     char **pool_table[MAX_POOLS];
     char tmp_str[4];
+    void *virtp;
 
     banner();
 
@@ -1957,30 +1996,14 @@ int __init cmem_init(void)
 
     __D("Allocated major number: %d\n", cmem_major);
 
-#ifdef USE_CLASS_SIMPLE
-    cmem_class = class_simple_create(THIS_MODULE, "cmem");
-#else
     cmem_class = class_create(THIS_MODULE, "cmem");
-#endif
     if (IS_ERR(cmem_class)) {
         __E("Error creating cmem device class.\n");
 	err = -EIO;
 	goto fail_after_reg;
     }
 
-#ifdef USE_CLASS_SIMPLE
-    class_simple_device_add(cmem_class, MKDEV(cmem_major, 0), NULL, "cmem");
-#else
-#ifdef USE_CLASS_DEVICE
-    class_device_create(cmem_class, NULL, MKDEV(cmem_major, 0), NULL, "cmem");
-#else
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
     device_create(cmem_class, NULL, MKDEV(cmem_major, 0), NULL, "cmem");
-#else
-    device_create(cmem_class, NULL, MKDEV(cmem_major, 0), "cmem");
-#endif // LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
-#endif // USE_CLASS_DEVICE
-#endif // USE_CLASS_SIMPLE
 
     pstart[0] = phys_start;
     pend[0] = phys_end;
@@ -2072,42 +2095,6 @@ int __init cmem_init(void)
 	    block_flags[bi] |= BLOCK_MEMREGION;
 	}
 
-	/*
-	 * We want to do this:
-	 *     block_virtp[bi] = ioremap_nocache(block_start[bi], length);
-	 * but ioremap_*() functions take only 32-bit physical addr, so
-	 * instead we alloc a vm range and map it manually with
-	 * ioremap_page_range().
-	 */
-	ioremap_area = __get_vm_area(length, VM_IOREMAP,
-	                             VMALLOC_START, VMALLOC_END);
-	if (!ioremap_area) {
-	    __E("_get_vm_area() failed\n");
-
-	    err = -ENOMEM;
-	    goto fail_after_create;
-	}
-	else {
-	    unsigned long addr = (unsigned long)ioremap_area->addr;
-
-	    ioremap_page_range(addr, addr + length,
-	                       block_start[bi], PAGE_KERNEL);
-	    block_virtp[bi] = ioremap_area->addr;
-	}
-
-	__D("ioremap_page_range(%#llx, %#lx)=0x%p\n",
-	    block_start[bi], length, block_virtp[bi]);
-
-	block_flags[bi] |= BLOCK_IOREMAP;
-	block_virtend[bi] = block_virtp[bi] + length;
-
-	/* block_virtoff can be negative, that's OK */
-	block_virtoff[bi] = block_start[bi] - (unsigned long)block_virtp[bi];
-
-	for (i = 0; i < length - 1; i += PAGE_SIZE) {
-	    *(int *)(block_virtp[bi] + i) = 0;
-	}
-
 	/* Parse and allocate the pools */
 	for (i = 0; i < npools[bi]; i++) {
 	    t = strsep(&pool_table[bi][i], "x");
@@ -2137,19 +2124,24 @@ int __init cmem_init(void)
 	/* use whatever is left for the heap */
 	heap_size[bi] = block_avail_size[bi] & PAGE_MASK;
 	if (heap_size[bi] > 0) {
-	    err = alloc_pool(bi, npools[bi], 1, heap_size[bi], &heap_virtp[bi]);
+	    err = alloc_pool(bi, npools[bi], 1, heap_size[bi], &heap_physp[bi]);
 	    if (err < 0) {
 		__E("Failed to alloc heap of size %#lx\n", heap_size[bi]);
 		goto fail_after_create;
 	    }
-	    printk(KERN_INFO "allocated heap buffer 0x%p of size %#lx\n",
-		   heap_virtp[bi], heap_size[bi]);
+	    printk(KERN_INFO "allocated heap buffer %#llx of size %#lx\n",
+		   (unsigned long long)heap_physp[bi], heap_size[bi]);
 	    heap_pool[bi] = npools[bi];
-	    header = (HeapMem_Header *)heap_virtp[bi];
-	    heap_head[bi].next = header;
+	    heap_head[bi].next = heap_physp[bi];
 	    heap_head[bi].size = heap_size[bi];
-	    header->next = NULL;
+
+	    map_header((void **)&virtp, heap_physp[bi], &ioremap_area);
+
+	    header = (HeapMem_Header *)virtp;
+	    header->next = 0;
 	    header->size = heap_size[bi];
+
+	    unmap_header(virtp, ioremap_area);
 
 	    if (useHeapIfPoolUnavailable) {
 		printk(KERN_INFO "heap fallback enabled - will try heap if "
@@ -2159,7 +2151,6 @@ int __init cmem_init(void)
 	else {
 	    __D(KERN_INFO "no remaining memory for heap, no heap created "
 	           "for memory block %d\n", bi);
-	    heap_head[bi].next = NULL;
 	    heap_head[bi].next = 0;
 	}
 
@@ -2188,17 +2179,6 @@ fail_after_create:
     length = block_end[bi] - block_start[bi];
 
     for (bi = 0; bi < NBLOCKS; bi++) {
-	if (block_flags[bi] & BLOCK_IOREMAP) {
-	    __D("unmapping 0x%p...\n", block_virtp[bi]);
-
-	    unmap_kernel_range_noflush((unsigned long)block_virtp[bi], length);
-	    free_vm_area(ioremap_area);
-
-	    block_flags[bi] &= ~BLOCK_IOREMAP;
-	}
-    }
-
-    for (bi = 0; bi < NBLOCKS; bi++) {
 	if (block_flags[bi] & BLOCK_MEMREGION) {
 	    __D("calling release_mem_region(%#llx, %#lx)...\n",
 	        block_start[bi], length);
@@ -2209,17 +2189,8 @@ fail_after_create:
 	}
     }
 
-#ifdef USE_CLASS_SIMPLE
-    class_simple_device_remove(MKDEV(cmem_major, 0));
-    class_simple_destroy(cmem_class);
-#else
-#ifdef USE_CLASS_DEVICE
-    class_device_destroy(cmem_class, MKDEV(cmem_major, 0));
-#else
     device_destroy(cmem_class, MKDEV(cmem_major, 0));
-#endif // USE_CLASS_DEVICE
     class_destroy(cmem_class);
-#endif // USE_CLASS_SIMPLE
 
 fail_after_reg:
     __D("Unregistering character device cmem\n");
@@ -2320,15 +2291,6 @@ void __exit cmem_exit(void)
 
 	length = block_end[bi] - block_start[bi];
 
-	if (block_flags[bi] & BLOCK_IOREMAP) {
-	    __D("unmapping 0x%p...\n", block_virtp[bi]);
-
-	    unmap_kernel_range_noflush((unsigned long)block_virtp[bi], length);
-	    free_vm_area(ioremap_area);
-
-	    block_flags[bi] &= ~BLOCK_IOREMAP;
-	}
-
 	if (block_flags[bi] & BLOCK_MEMREGION) {
 	    __D("calling release_mem_region(%#llx, %#lx)...\n",
 	        block_start[bi], length);
@@ -2339,17 +2301,8 @@ void __exit cmem_exit(void)
 	}
     }
 
-#ifdef USE_CLASS_SIMPLE
-    class_simple_device_remove(MKDEV(cmem_major, 0));
-    class_simple_destroy(cmem_class);
-#else
-#ifdef USE_CLASS_DEVICE
-    class_device_destroy(cmem_class, MKDEV(cmem_major, 0));
-#else
     device_destroy(cmem_class, MKDEV(cmem_major, 0));
-#endif // USE_CLASS_DEVICE
     class_destroy(cmem_class);
-#endif // USE_CLASS_SIMPLE
 
     __D("Unregistering character device cmem\n");
     unregister_chrdev(cmem_major, "cmem");

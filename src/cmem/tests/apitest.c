@@ -531,6 +531,7 @@ int main(int argc, char *argv[])
 	    }
 
 	    testHeap(size, i);
+	    testHeap(size, i);
 	    testCache(size, i);
 	}
     }
