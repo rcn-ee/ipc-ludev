@@ -35,7 +35,7 @@
 
 TOOLCHAIN_LONGNAME ?= arm-none-linux-gnueabi
 TOOLCHAIN_INSTALL_DIR ?= $(VENDORS)/cs/arm/arm-2010q1
-TOOLCHAIN_PREFIX = $(TOOLCHAIN_INSTALL_DIR)/bin/$(TOOLCHAIN_LONGNAME)-
+TOOLCHAIN_PREFIX ?= $(TOOLCHAIN_INSTALL_DIR)/bin/$(TOOLCHAIN_LONGNAME)-
 
 #=============== CMEM module component paths and opions  ======================
 
