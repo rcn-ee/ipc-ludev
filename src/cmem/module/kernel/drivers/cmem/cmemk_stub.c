@@ -15,6 +15,53 @@
  */
 /*
  * cmemk_stub.c
+ *
+ * This file provides support for the CMEM CMA-based allocations by the
+ * loadable kernel module cmemk.ko.  It reserves CMA regions (areas) for
+ * later allocations by CMEM.  These CMA regions are defined according to
+ * two kernel command line parameters:
+ *     cmem_cma_pools=<n>x<s>[,<n>x<s>,...]
+ *     cmem_cma_heapsize=<sKMG>
+ * where
+ *     <n>x<s> specifies a pool of <n> buffers of size <s> bytes
+ *     <sKMG> is a heapsize specified according to 's' KBs, MBs, or GBs (or
+ *          just 's' bytes when no letter suffix is specified)
+ *
+ * This file must be builtin to the kernel, since it contains a function
+ * that must be called extremely early in the boot procedure.
+ *
+ * It is suggested that this file be placed according to the directory
+ * structure as placed in the linuxutils product, in
+ *     <kernel>/drivers/cmem/cmemk_stub.c
+ *     <kernel>/drivers/cmem/Makefile
+ *     <kernel>/include/linux/cmemk_stub.h - more than a suggestion to place
+ *         this file here, as the loadable portion of CMEM, cmemk.ko, expects
+ *         it here
+ * In doing so, the contents of
+ *     <linuxutils>/drivers/Makefile
+ * should be copied to the existing
+ *     <kernel>/drivers/Makefile
+ *
+ * To give "energy" to this stub, you must place a call to
+ *     cmem_reserve_cma();
+ * in your machine's "early boot" '.reserve' procedure.  This is accomplished
+ * by either assigning MACHINE_START.reserve to cmem_reserve_cma, or, if your
+ * machine already has a .reserve function assignment, placing a call to
+ * cmem_reserve_cma() somewhere in that function.  For example, for the
+ * OMAP-L138 "Hawkboard", the following code in
+ *     arch/arm/mach-davinci/board-omapl138-hawk.c
+ * illustrates this:
+ * MACHINE_START(OMAPL138_HAWKBOARD, "AM18x/OMAP-L138 Hawkboard")
+ *        .atag_offset    = 0x100,
+ *        .map_io         = omapl138_hawk_map_io,
+ *        .init_irq       = cp_intc_init,
+ *        .timer          = &davinci_timer,
+ *        .init_machine   = omapl138_hawk_init,
+ *        .init_late      = davinci_init_late,
+ *        .dma_zone_size  = SZ_128M,
+ *        .restart        = da8xx_restart,
+ *        .reserve        = cmem_reserve_cma,
+ * MACHINE_END
  */
 #include <linux/device.h>
 #include <linux/dma-mapping.h>
@@ -29,27 +76,25 @@
 
 #include <linux/cmemk_stub.h>
 
-int cmem_npools = 1;
-int cmem_heapsize = 0;
-struct device cmem_dev[CMEM_MAXPOOLS];
-struct pool_object cmem_p_objs[CMEM_MAXPOOLS];
+int cmem_cma_npools = 0;
+int cmem_cma_heapsize = 0;
+struct device cmem_cma_dev[CMEM_MAXPOOLS];
+struct pool_object cmem_cma_p_objs[CMEM_MAXPOOLS];
 
-EXPORT_SYMBOL(cmem_npools);
-EXPORT_SYMBOL(cmem_heapsize);
-EXPORT_SYMBOL(cmem_dev);
-EXPORT_SYMBOL(cmem_p_objs);
+EXPORT_SYMBOL(cmem_cma_npools);
+EXPORT_SYMBOL(cmem_cma_heapsize);
+EXPORT_SYMBOL(cmem_cma_dev);
+EXPORT_SYMBOL(cmem_cma_p_objs);
 
 static int __init early_cmemheapsize(char *p)
 {
-    cmem_heapsize = memparse(p, NULL);
-    cmem_p_objs[0].reqsize = cmem_heapsize;
-    cmem_p_objs[0].numbufs = 1;
+    cmem_cma_heapsize = memparse(p, NULL);
 
-    pr_debug("cmemheapsize: heapsize=0x%x\n", cmem_heapsize);
+    pr_debug("cmemheapsize: heapsize=0x%x\n", cmem_cma_heapsize);
 
     return 0;
 }
-early_param("cmem_heapsize", early_cmemheapsize);
+early_param("cmem_cma_heapsize", early_cmemheapsize);
 
 static int __init early_cmempools(char *p)
 {
@@ -61,18 +106,19 @@ static int __init early_cmempools(char *p)
 	x = strchr(p, 'x');
 	if (x != NULL) {
 	    *x = '\0';
-	    n = cmem_npools;
+	    n = cmem_cma_npools;
 	    if (n == CMEM_MAXPOOLS) {
 		pr_err("cmempools: CMEM_MAXPOOLS reached!\n");
 
 		break;
 	    }
-	    cmem_p_objs[n].numbufs = memparse(p, NULL);
-	    cmem_p_objs[n].reqsize = memparse(x + 1, &x);
+	    cmem_cma_p_objs[n].numbufs = memparse(p, NULL);
+	    cmem_cma_p_objs[n].reqsize = memparse(x + 1, &x);
 
-	    pr_debug("cmempools: pool %d = %d * 0x%x\n", n, cmem_p_objs[n].numbufs, cmem_p_objs[n].reqsize);
+	    pr_debug("cmempools: pool %d = %d * 0x%x\n", n,
+	             cmem_cma_p_objs[n].numbufs, cmem_cma_p_objs[n].reqsize);
 
-	    cmem_npools++;
+	    cmem_cma_npools++;
 
 	    if (*x++ == ',') {
 		p = x;
@@ -88,21 +134,7 @@ static int __init early_cmempools(char *p)
 
     return 0;
 }
-early_param("cmem_pools", early_cmempools);
-
-
-struct page *cmem_alloc(struct device *dev, int count, int order)
-{
-    return dma_alloc_from_contiguous(dev, count, order);
-}
-EXPORT_SYMBOL(cmem_alloc);
-
-
-int cmem_release(struct device *dev, struct page *page, int count)
-{
-    return dma_release_from_contiguous(dev, page, count);
-}
-EXPORT_SYMBOL(cmem_release);
+early_param("cmem_cma_pools", early_cmempools);
 
 static void cmem_device_release(struct device *dev)
 {
@@ -124,86 +156,40 @@ void __init cmem_reserve_cma(void)
 
     pr_debug("cmem_reserve_cma()...\n");
 
-    for (i = 0; i < cmem_npools; i++) {
-	if (i == 0) {
-	    pr_debug("cmem_reserve_cma: heapsize 0x%x specified\n", cmem_heapsize);
-	}
-	reqsize = cmem_p_objs[i].reqsize;
+    if (cmem_cma_heapsize) {
+	/* heap "pool" */
+	pr_debug("cmem_reserve_cma: heapsize 0x%x specified\n",
+	         cmem_cma_heapsize);
+	cmem_cma_p_objs[cmem_cma_npools].reqsize = cmem_cma_heapsize;
+	cmem_cma_p_objs[cmem_cma_npools].numbufs = 1;
+
+	cmem_cma_npools++;
+    }
+
+    for (i = 0; i < cmem_cma_npools; i++) {
+	reqsize = cmem_cma_p_objs[i].reqsize;
 	if (reqsize != 0) {
-	    nbufs = cmem_p_objs[i].numbufs;
+	    nbufs = cmem_cma_p_objs[i].numbufs;
 	    size = round_up(reqsize, PAGE_SIZE);
 	    poolsize = nbufs * size;
-	    rv = dma_declare_contiguous(&cmem_dev[i], poolsize, 0, 0xffffffff);
+	    rv = dma_declare_contiguous(&cmem_cma_dev[i], poolsize, 0,
+	                                0xffffffff);
 
 	    if (rv) {
-		pr_err("cmem_reserve_cma: dma_declare_contiguous failed %d\n", rv);
+		pr_err("cmem_reserve_cma: dma_declare_contiguous failed %d\n",
+		       rv);
 
 		/* size of 0 means no buffers available */
-		cmem_p_objs[i].size = 0;
+		cmem_cma_p_objs[i].size = 0;
 	    }
 	    else {
 		pr_debug("cmem_reserve_cma: dma_declare_contiguous succeeded\n");
-		cmem_dev[i].release = cmem_device_release;
+		cmem_cma_dev[i].release = cmem_device_release;
 
 		/* numbufs and reqsize already set in early_cmempools() */
-		INIT_LIST_HEAD(&cmem_p_objs[i].busylist);
-		cmem_p_objs[i].size = size;
+		cmem_cma_p_objs[i].size = size;
 	    }
 	}
-	else {
-	    INIT_LIST_HEAD(&cmem_p_objs[i].busylist);
-	}
     }
 }
-
-#if 0
-void __init test_dma_contig(struct device *dev, int count, int order)
-{
-    struct page *cma_page[16];
-    void *va;
-    int i;
-
-    for (i = 0; i < 16; i++) {
-	cma_page[i] = dma_alloc_from_contiguous(dev, count, order);
-	if (!cma_page[i]) {
-	    printk("dma_alloc_from_contiguous(%p, %d, %d) failed\n", dev, count, order);
-	}
-	else {
-	    printk("dma_alloc_from_contiguous(%p, %d, %d) SUCCEEDED: page=%p pfn=0x%lx(000)\n", dev, count, order, cma_page[i], page_to_pfn(cma_page[i]));
-	    va = page_address(cma_page[i]);
-//	    printk("page_address()=%p, getPhys(%p)=0x%lx\n", va, va, get_phys((unsigned long)va));
-	    printk("page_address()=%p, getPhys(%p)=0x%lx\n", va, va, page_to_pfn(cma_page[i]) << PAGE_SHIFT);
-	}
-    }
-    for (i = 0; i < 16; i++) {
-	if (cma_page[i]) {
-	    printk("dma_release_from_contiguous(%p, %p, %d)...\n", dev, cma_page[i], count);
-	    dma_release_from_contiguous(dev, cma_page[i], count);
-	}
-    }
-}
-
-void __init cmem_test_init(void)
-{
-    printk("cmem_test_init(): calling test_dma_contig(1, 0)...\n");
-
-    test_dma_contig(&cmem_dev[0], 1, 0);
-    test_dma_contig(&cmem_dev[0], 2, 0);
-    test_dma_contig(&cmem_dev[0], 4, 0);
-    test_dma_contig(&cmem_dev[0], 1, 1);
-    test_dma_contig(&cmem_dev[0], 2, 1);
-    test_dma_contig(&cmem_dev[0], 4, 1);
-    test_dma_contig(&cmem_dev[0], 1, 2);
-    test_dma_contig(&cmem_dev[0], 2, 2);
-    test_dma_contig(&cmem_dev[0], 4, 2);
-    test_dma_contig(&cmem_dev[0], 1, 3); // order 3 = pages aligned to 0x8000
-    test_dma_contig(&cmem_dev[0], 8, 3);
-    test_dma_contig(&cmem_dev[0], 9, 3);
-    test_dma_contig(&cmem_dev[0], 16, 3);
-
-    printk("...done\n");
-}
-#endif
-
-MODULE_LICENSE("GPL");
 

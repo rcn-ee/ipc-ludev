@@ -15,6 +15,10 @@ EXTRA_CFLAGS +=	-I $(ABS_ROOTDIR)/include
 
 MAKE_ENV = ARCH=arm CROSS_COMPILE=$(TOOLCHAIN_PREFIX)
 
+ifeq ("$(CMEM_KERNEL_STUB)", "1")
+EXTRA_CFLAGS += -DCMEM_KERNEL_STUB
+endif
+
 debug: EXTRA_CFLAGS += -D__DEBUG
 
 .PHONY: clean debug release install glibc

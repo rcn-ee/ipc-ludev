@@ -47,7 +47,8 @@
  *       specification due to the use of "x" as a token separator
  *     - it's possible to insmod cmemk.ko without specifying any memory blocks,
  *       in which case CMEM_getPhys() and CMEM_cache*() APIs can still be
- *       utilized by an application.
+ *       utilized by an application, and CMA-based allocations can still be
+ *       accomplished (by using blockid as CMEM_CMABLOCKID).
  *
  * This particular command creates 2 pools. The first pool is created with 4
  * buffers of size 30000 bytes and the second pool is created with 2 buffers
@@ -133,6 +134,68 @@
  * Only when the last registered file descriptor frees a buffer (either
  * explictily, or by auto-cleanup) does a buffer actually get freed back to
  * the kernel module.
+ *
+ * CMA access
+ * ----------
+ *
+ * On systems with CMA (Contiguous Memory Allocator) support, CMEM can be used
+ * to allocate CMA buffers.  Both heap and pool allocations are supported.  A
+ * special block ID, CMEM_CMABLOCKID, is used for these allocations, and
+ * therefore the block-based CMEM APIs must be used (the ones ending in "2",
+ * such as CMEM_alloc2()), where the 'blockid' parameter is CMEM_CMABLOCKID
+ * (instead of 0 or 1).
+ *
+ * CMA always contains, at the minimum, a global area that can be accessed
+ * by any device driver.  CMEM treats this global area as a heap, which means
+ * that heap-based allocations can be performed on CMEM_CMABLOCKID.
+ * See the Linux CMA documentation for details on specifying this global area.
+ * Keep in mind that other Linux kernel entities can (and will) also allocate
+ * memory from this global area, so you never really know how much is
+ * available for allocations by CMEM.
+ *
+ * To achieve pool-based allocations from CMA, a special CMEM stub must be
+ * builtin to the kernel, and CMEM must be built with CMEM_KERNEL_STUB=1 for
+ * the 'make' command (which turns into -DCMEM_KERNEL_STUB on the compile
+ * command).  This stub processes a kernel command line parameter named
+ * "cmem_cma_pools=..." in the same fashion as the standard CMEM "pools=...".
+ * A separate CMA region (area) is created for each of the separate
+ * "cmem_cma_pools" (where each pool/region is one element of the comma-
+ * separated list).
+ *
+ * The CMEM builtin kernel stub is located in
+ *     <linuxutils>/src/cmem/module/kernel/drivers/cmem/cmemk_stub.c
+ * You don't need this stub if you want to allocate only from the CMA
+ * global area.  Please see comments at the head of the above file for
+ * instructions on how to incorporate it into your kernel.
+ *
+ * In supporting the pool model of CMEM, a separate CMA region is created for
+ * each pool.  A pool consists of n buffers of size s, resulting in a region
+ * that is sized accordingly.  CMA places no restrictions on the size of an
+ * allocation from a region, so the buffer size 's' becomes more of a
+ * convention than a hard rule.  Given enough free space, any pool can be
+ * used to allocate a buffer of any size, but it is recommended to partition
+ * regions (or, in this case, pools) according to the size of buffers that
+ * will be allocated in order to reduce fragmentation and wasted memory due
+ * to size-based alignment padding.  In other words, if your system will be
+ * allocating buffers of sizes 4096, 131072, and 1048576, create pools of
+ *     cmem_cma_pools=<n1>x4096,<n2>x131072,<n3>x1048576
+ * and perform allocations from the respective pool.
+ *
+ * An application doesn't need to know the pool IDs that correspond to the
+ * respective sizes of that pool's buffers.  The CMEM_alloc2() API decides
+ * which pool to use according to the requested size of allocation, and will
+ * choose the one that fits most efficiently.  Unlike non-CMA pool allocations
+ * where, when the "best fit" pool has no remaining buffers it will choose a
+ * pool with larger available buffers, CMEM_alloc2() won't "promote" a
+ * CMA-based pool allocation to a pool with buffers larger than the the best
+ * fit.
+ *
+ * CMEM supports a kernel command line parameter named "cmem_cma_heapsize".
+ * When assigned, a CMA region of size "cmem_cma_heapsize" is created for use
+ * by CMEM heap allocations for the CMA "block".  This heap is then used for
+ * CMEM CMA heap allocations, and the CMA global area is no longer used by
+ * CMEM.  This allows CMEM to have full usage of the CMEM CMA heap without
+ * possible allocations by non-CMEM entities in the kernel.
  */
 /**
  *  @defgroup   ti_CMEM  Contiguous Memory Manager
@@ -154,6 +217,9 @@ extern "C" {
 
 #define MAX_POOLS 32
 
+/* magic "block" corresponding to CMA regions */
+#define CMEM_CMABLOCKID			-1
+
 /* ioctl cmd "flavors" */
 #define CMEM_WB				0x00010000
 #define CMEM_INV			0x00020000
@@ -162,7 +228,6 @@ extern "C" {
 #define CMEM_CACHED			0x00080000  /**< allocated buffer is cached */
 #define CMEM_NONCACHED			0x00000000  /**< allocated buffer is not cached */
 #define CMEM_PHYS			0x00100000
-#define CMEM_CMA			0x00200000
 
 #define CMEM_IOCMAGIC			0x0000fe00
 

@@ -21,22 +21,22 @@
 extern "C" {
 #endif
 
+#include <linux/device.h>
+
 #define CMEM_MAXPOOLS 8
 
 struct pool_object {
+    struct list_head freelist;
     struct list_head busylist;
     unsigned int numbufs;
     unsigned int size;
     unsigned int reqsize;
 };
 
-extern struct pool_object cmem_p_objs[CMEM_MAXPOOLS];
-extern struct device cmem_dev[CMEM_MAXPOOLS];
-extern int cmem_heapsize;
-extern int cmem_npools;
-
-extern struct page *cmem_alloc(struct device *dev, int count, int order);
-extern int cmem_release(struct device *dev, struct page *page, int count);
+extern struct pool_object cmem_cma_p_objs[];
+extern struct device cmem_cma_dev[];
+extern int cmem_cma_heapsize;
+extern int cmem_cma_npools;
 
 #if defined (__cplusplus)
 }

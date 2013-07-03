@@ -51,7 +51,7 @@
 #include <ti/cmem.h>
 
 #define NUMHEAPPTRS 0x1000
-unsigned int *heap_ptrs[NUMHEAPPTRS];
+unsigned int *ptrs[NUMHEAPPTRS];
 int nblocks;
 
 int writereadCMA(int size)
@@ -62,10 +62,10 @@ int writereadCMA(int size)
     char *heap_ptr;
 
     printf("allocating write-read heap buffer from CMA memory block...\n");
-    params.type = CMEM_CMA;
+    params.type = CMEM_HEAP;
     params.flags = CMEM_NONCACHED;
     params.alignment = 0;
-    heap_ptr = CMEM_alloc(size, &params);
+    heap_ptr = CMEM_alloc2(CMEM_CMABLOCKID, size, &params);
     if (heap_ptr == NULL) {
 	printf("...failed\n");
 	return -1;
@@ -118,12 +118,12 @@ void testCMA(int size)
     printf("    (will end with expected failed allocation)\n");
 
     num_buffers = 0;
-    params.type = CMEM_CMA;
+    params.type = CMEM_HEAP;
     params.flags = CMEM_NONCACHED;
     params.alignment = 0;
     while (num_buffers < NUMHEAPPTRS) {
-	heap_ptrs[num_buffers] = CMEM_alloc(size, &params);
-	if (heap_ptrs[num_buffers] == NULL) {
+	ptrs[num_buffers] = CMEM_alloc2(CMEM_CMABLOCKID, size, &params);
+	if (ptrs[num_buffers] == NULL) {
 	    break;
 	}
 	num_buffers++;
@@ -135,27 +135,27 @@ void testCMA(int size)
 
     printf("freeing heap blocks...\n");
     for (i = 0; i < num_buffers; i++) {
-	rv = CMEM_free(heap_ptrs[i], &params);
+	rv = CMEM_free(ptrs[i], &params);
 	if (rv < 0) {
 	    printf("error freeing blocks\n");
 	    break;
 	}
-	heap_ptrs[i] = NULL;
+	ptrs[i] = NULL;
     }
     printf("...done\n");
 
     /* make sure we can still allocate num_buffers after freeing */
     printf("allocating %d heap blocks...\n", num_buffers);
     for (i = 0; i < num_buffers; i++) {
-	heap_ptrs[i] = CMEM_alloc(size, &params);
-	if (heap_ptrs[i] == NULL) {
+	ptrs[i] = CMEM_alloc2(CMEM_CMABLOCKID, size, &params);
+	if (ptrs[i] == NULL) {
 	    printf("error re-allocating %d heap blocks\n", num_buffers);
 	    break;
 	}
     }
     printf("...done, freeing heap blocks...\n");
     for (i = 0; i < num_buffers; i++) {
-	rv = CMEM_free(heap_ptrs[i], &params);
+	rv = CMEM_free(ptrs[i], &params);
 	if (rv < 0) {
 	    printf("error freeing blocks\n");
 	    break;
@@ -184,8 +184,8 @@ void testHeap(int size, int block)
     params.flags = CMEM_NONCACHED;
     params.alignment = 0;
     while (num_buffers < NUMHEAPPTRS) {
-	heap_ptrs[num_buffers] = CMEM_alloc2(block, size, &params);
-	if (heap_ptrs[num_buffers] == NULL) {
+	ptrs[num_buffers] = CMEM_alloc2(block, size, &params);
+	if (ptrs[num_buffers] == NULL) {
 	    break;
 	}
 	num_buffers++;
@@ -197,26 +197,82 @@ void testHeap(int size, int block)
 
     printf("freeing heap blocks...\n");
     for (i = 0; i < num_buffers; i++) {
-	rv = CMEM_free(heap_ptrs[i], &params);
+	rv = CMEM_free(ptrs[i], &params);
 	if (rv < 0) {
 	    printf("error freeing blocks\n");
 	    break;
 	}
-	heap_ptrs[i] = NULL;
+	ptrs[i] = NULL;
     }
 
     /* make sure we can still allocate num_buffers after freeing */
     printf("allocating %d heap blocks...\n", num_buffers);
     for (i = 0; i < num_buffers; i++) {
-	heap_ptrs[i] = CMEM_alloc2(block, size, &params);
-	if (heap_ptrs[i] == NULL) {
+	ptrs[i] = CMEM_alloc2(block, size, &params);
+	if (ptrs[i] == NULL) {
 	    printf("error re-allocating %d heap blocks\n", num_buffers);
 	    break;
 	}
     }
     printf("...done, freeing heap blocks...\n");
     for (i = 0; i < num_buffers; i++) {
-	rv = CMEM_free(heap_ptrs[i], &params);
+	rv = CMEM_free(ptrs[i], &params);
+	if (rv < 0) {
+	    printf("error freeing blocks\n");
+	    break;
+	}
+    }
+    printf("...done\n");
+}
+
+void testPools(int size, int block)
+{
+    int rv;
+    int num_buffers;
+    int i;
+    CMEM_AllocParams params;
+
+    printf("allocating pool buffers from CMEM memory block %d...\n", block);
+    printf("    (will end with expected failed allocation)\n");
+
+    num_buffers = 0;
+    params.type = CMEM_POOL;
+    params.flags = CMEM_NONCACHED;
+    params.alignment = 0;
+    while (num_buffers < NUMHEAPPTRS) {
+	ptrs[num_buffers] = CMEM_alloc2(block, size, &params);
+	if (ptrs[num_buffers] == NULL) {
+	    break;
+	}
+	num_buffers++;
+    }
+    printf("...done, %d allocated\n", num_buffers);
+
+    printf("Press ENTER to continue\n");
+    getchar();
+
+    printf("freeing pool blocks...\n");
+    for (i = 0; i < num_buffers; i++) {
+	rv = CMEM_free(ptrs[i], &params);
+	if (rv < 0) {
+	    printf("error freeing blocks\n");
+	    break;
+	}
+	ptrs[i] = NULL;
+    }
+
+    /* make sure we can still allocate num_buffers after freeing */
+    printf("allocating %d pool blocks...\n", num_buffers);
+    for (i = 0; i < num_buffers; i++) {
+	ptrs[i] = CMEM_alloc2(block, size, &params);
+	if (ptrs[i] == NULL) {
+	    printf("error re-allocating %d heap blocks\n", num_buffers);
+	    break;
+	}
+    }
+    printf("...done, freeing pool blocks...\n");
+    for (i = 0; i < num_buffers; i++) {
+	rv = CMEM_free(ptrs[i], &params);
 	if (rv < 0) {
 	    printf("error freeing blocks\n");
 	    break;
@@ -532,12 +588,17 @@ int main(int argc, char *argv[])
 
 	    testHeap(size, i);
 	    testHeap(size, i);
+	    testPools(size, i);
+	    testPools(size, i);
 	    testCache(size, i);
 	}
     }
     else {
 	printf("    no physical block found, not performing block-based testing\n");
     }
+
+    /* block 'nblocks' is the special CMEM CMA "block" */
+    testPools(size, CMEM_CMABLOCKID);
 
     printf("\nexiting...\n");
     if (CMEM_exit() < 0) {

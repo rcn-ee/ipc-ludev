@@ -152,10 +152,24 @@ typedef struct pool_buffer {
     dma_addr_t dma;             /* used only for CMA-based allocs */
     int id;
     phys_addr_t physp;
-    int flags;			/* CMEM_CACHED or CMEM_NONCACHED or CMEM_CMA */
+    int flags;			/* CMEM_CACHED or CMEM_NONCACHED */
     void *kvirtp;		/* used only for CMA-based allocs */
     size_t size;		/* used only for heap-based allocs */
+    struct device *dev;		/* used only for CMA-based allocs */
 } pool_buffer;
+
+typedef struct registered_user {
+    struct list_head element;
+    struct file *filp;
+} registered_user;
+
+#ifdef CMEM_KERNEL_STUB
+
+#include <linux/cmemk_stub.h>
+
+typedef struct pool_object pool_object;
+
+#else
 
 /* Describes a pool */
 typedef struct pool_object {
@@ -166,18 +180,18 @@ typedef struct pool_object {
     unsigned int reqsize;
 } pool_object;
 
-typedef struct registered_user {
-    struct list_head element;
-    struct file *filp;
-} registered_user;
+static int cmem_cma_npools = 0;
+static int cmem_cma_heapsize = 0;
+static struct device *cmem_cma_dev;
+static struct pool_object *cmem_cma_p_objs;
+
+#endif
 
 /*
- * For CMA global area allocations we treat p_objs[NBLOCKS] as a special
- * "pool" array.  There is only one pool_object used, p_objs[NBLOCKS][0],
- * as the "heap pool" for this block.  See the comment for
- * heap_pool[NBLOCKS + 1] below for further explanation.
+ * For CMA allocations we treat p_objs[NBLOCKS] as a special "pool" array.
  */
-pool_object p_objs[NBLOCKS + 1][MAX_POOLS];
+static pool_object p_objs[NBLOCKS + 1][MAX_POOLS];
+
 
 /* Forward declaration of system calls */
 static long ioctl(struct file *filp, unsigned int cmd, unsigned long args);
@@ -271,7 +285,7 @@ static int map_header(void **vaddrp, phys_addr_t physp, struct vm_struct **vm)
     *vaddrp = (*vm)->addr;
 
     __D("map_header: ioremap_page_range(%#llx, %#lx)=0x%p\n",
-        physp, PAGE_SIZE, *vaddrp);
+        (unsigned long long)physp, PAGE_SIZE, *vaddrp);
 
     return 0;
 }
@@ -314,10 +328,10 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
     HeapMem_Header *newHeader;
     phys_addr_t curHeaderPhys;
     phys_addr_t prevHeaderPhys = 0;
-    phys_addr_t newHeaderPhys;
+    phys_addr_t newHeaderPhys = 0;  /* init to quiet compiler */
     phys_addr_t allocAddr;
     size_t curSize, adjSize;
-    size_t remainSize; /* free memory after allocated memory      */
+    size_t remainSize;  /* free memory after allocated memory */
     size_t adjAlign, offset;
 //    long key;
 
@@ -1029,7 +1043,7 @@ static int alloc_pool(int bi, int idx, int num, int reqsize, phys_addr_t *physpR
     INIT_LIST_HEAD(freelistp);
     INIT_LIST_HEAD(busylistp);
 
-    for (i=0; i < num; i++) {
+    for (i = 0; i < num; i++) {
         entry = kmalloc(sizeof(struct pool_buffer), GFP_KERNEL);
 
         if (!entry) {
@@ -1105,8 +1119,10 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
     int i;
     int bi;
     int id;
+    int pool_alloc;
     struct block_struct block;
     union CMEM_AllocUnion allocDesc;
+    struct device *dev = NULL;
 
     if (_IOC_TYPE(cmd) != _IOC_TYPE(CMEM_IOCMAGIC)) {
 	__E("ioctl(): bad command type %#x (should be %#x)\n",
@@ -1121,22 +1137,30 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 
 	    size = allocDesc.alloc_heap_inparams.size;
 	    align = allocDesc.alloc_heap_inparams.align;
+	    bi = allocDesc.alloc_heap_inparams.blockid;
 
-	    if (cmd & CMEM_CMA) {
+	    if (bi == CMEM_CMABLOCKID) {
 		bi = NBLOCKS;
-	    }
-	    else {
-		bi = allocDesc.alloc_heap_inparams.blockid;
+
+		if (cmem_cma_heapsize == 0) {
+		    __D("no explicit CMEM CMA heap, using global area\n");
+		    dev = NULL;
+		}
+		else {
+		    dev = &cmem_cma_dev[heap_pool[bi]];
+		}
 	    }
 
             __D("ALLOCHEAP%s ioctl received on heap pool for block %d\n",
 	        cmd & CMEM_CACHED ? "CACHED" : "", bi);
 
-	    if (bi > NBLOCKS) {
+	    if (bi > NBLOCKS || bi < 0) {
 		__E("ioctl: invalid block id %d, must be < %d\n",
 		    bi, NBLOCKS);
 		return -EINVAL;
 	    }
+
+	    /* heap_pool[NBLOCKS] (the CMA heap) is always available */
 	    if (bi < NBLOCKS && heap_pool[bi] == -1) {
 		__E("ioctl: no heap available in block %d\n", bi);
 		return -EINVAL;
@@ -1144,6 +1168,8 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 
 	    pool = heap_pool[bi];
 
+	    pool_alloc = 0;
+alloc:
 	    entry = kmalloc(sizeof(struct pool_buffer), GFP_KERNEL);
 	    if (!entry) {
 		__E("ioctl: failed to kmalloc pool_buffer struct for heap");
@@ -1155,14 +1181,16 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 		return -ERESTARTSYS;
 	    }
 
-	    if (cmd & CMEM_CMA) {
-		virtp = dma_alloc_coherent(NULL, size, &dma, GFP_KERNEL);
+	    if (bi == NBLOCKS) {
+		virtp = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
 
 		physp = dma;
+		entry->dev = dev;
 		entry->kvirtp = virtp;
 	    }
 	    else {
 		physp = HeapMem_alloc(bi, size, align, ALLOCRUN);
+
 		/* set only for test just below here */
 		virtp = (void *)(unsigned int)physp;
 	    }
@@ -1193,8 +1221,19 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 
             mutex_unlock(&cmem_mutex);
 
-	    if (put_user(physp, llargp)) {
-		return -EFAULT;
+	    if (pool_alloc) {
+		allocDesc.alloc_pool_outparams.physp = physp;
+		allocDesc.alloc_pool_outparams.size = size;
+
+		if (copy_to_user(argp, &allocDesc, sizeof(allocDesc))) {
+		    mutex_unlock(&cmem_mutex);
+		    return -EFAULT;
+		}
+	    }
+	    else {
+		if (put_user(physp, llargp)) {
+		    return -EFAULT;
+		}
 	    }
 
             __D("ALLOCHEAP%s: allocated %#x size buffer at %#llx (phys address)\n",
@@ -1213,18 +1252,16 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
             }
 
 	    pool = allocDesc.alloc_pool_inparams.poolid;
+	    bi = allocDesc.alloc_pool_inparams.blockid;
 
-	    if (cmd & CMEM_CMA) {
+	    if (bi == CMEM_CMABLOCKID) {
 		bi = NBLOCKS;
-	    }
-	    else {
-		bi = allocDesc.alloc_pool_inparams.blockid;
 	    }
 
             __D("ALLOC%s ioctl received on pool %d for memory block %d\n",
 	        cmd & CMEM_CACHED ? "CACHED" : "", pool, bi);
 
-	    if (bi > NBLOCKS) {
+	    if (bi > NBLOCKS || bi < 0) {
 		__E("ioctl: invalid block id %d, must be < %d\n",
 		    bi, NBLOCKS);
 		return -EINVAL;
@@ -1235,6 +1272,15 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 		    cmd & CMEM_CACHED ? "CACHED" : "", pool);
                 return -EINVAL;
             }
+
+	    if (bi == NBLOCKS) {
+		size = p_objs[bi][pool].size;
+		dev = &cmem_cma_dev[pool];
+		align = 0;
+		pool_alloc = 1;
+
+		goto alloc;
+	    }
 
             busylistp = &p_objs[bi][pool].busylist;
 	    freelistp = &p_objs[bi][pool].freelist;
@@ -1363,7 +1409,7 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 
 		if (registeredlistp->next == registeredlistp) {
 		    /* no more registered users, free buffer */
-		    if (pool == heap_pool[bi]) {
+		    if (bi == NBLOCKS || pool == heap_pool[bi]) {
 			if (!(cmd & CMEM_PHYS) && bi != NBLOCKS) {
 			    /*
 			     * Need to invalidate possible cached entry for
@@ -1384,7 +1430,7 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 			}
 
 			if (bi == NBLOCKS) {
-			    dma_free_coherent(NULL, entry->size,
+			    dma_free_coherent(entry->dev, entry->size,
 			                      entry->kvirtp, entry->dma);
 			}
 			else {
@@ -1472,7 +1518,11 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 	    pool = allocDesc.get_size_inparams.poolid;
 	    bi = allocDesc.get_size_inparams.blockid;
 
-	    if (bi >= NBLOCKS) {
+	    if (bi == CMEM_CMABLOCKID) {
+		bi = NBLOCKS;
+	    }
+
+	    if (bi > NBLOCKS || bi < 0) {
 		__E("ioctl: invalid block id %d, must be < %d\n",
 		    bi, NBLOCKS);
 		return -EINVAL;
@@ -1502,7 +1552,11 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 	    reqsize = allocDesc.get_pool_inparams.size;
 	    bi = allocDesc.get_pool_inparams.blockid;
 
-	    if (bi >= NBLOCKS) {
+	    if (bi == CMEM_CMABLOCKID) {
+		bi = NBLOCKS;
+	    }
+
+	    if (bi > NBLOCKS || bi < 0) {
 		__E("ioctl: invalid block id %d, must be < %d\n",
 		    bi, NBLOCKS);
 		return -EINVAL;
@@ -1513,7 +1567,7 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 	    }
 
             __D("GETPOOL: Trying to find a pool to fit size %d\n", reqsize);
-            for (i=0; i<npools[bi]; i++) {
+            for (i = 0; i < npools[bi]; i++) {
                 size = p_objs[bi][i].size;
                 freelistp = &p_objs[bi][i].freelist;
 
@@ -1522,10 +1576,19 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
                     __D("GETPOOL: delta (%d) < olddelta (%d)?\n",
                         size - reqsize, delta);
                     if ((size - reqsize) < delta) {
-                        if (list_empty(freelistp) == 0) {
-                            delta = size - reqsize;
-                            __D("GETPOOL: Found a best fit delta %d\n", delta);
-                            pool = i;
+                        if (bi < NBLOCKS) {
+			    if (!list_empty(freelistp)) {
+				delta = size - reqsize;
+				pool = i;
+				__D("GETPOOL: Found a best fit delta %d in pool %d\n",
+				    delta, pool);
+			    }
+                        }
+			else {
+			    delta = size - reqsize;
+			    pool = i;
+			    __D("GETPOOL: Found a best fit delta %d in CMA block\n",
+				    delta);
                         }
                     }
                 }
@@ -1682,7 +1745,7 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
             }
 
 	    bi = allocDesc.blockid;
-	    if (bi >= nblocks) {
+	    if (bi >= nblocks || bi < 0) {
 		__E("GETBLOCK: invalid block ID %d\n", bi);
 
 		return -EINVAL;
@@ -1850,7 +1913,7 @@ static int release(struct inode *inode, struct file *filp)
 	}
 
 	/* Clean up any buffers on the busy list when cmem is closed */
-	for (i=0; i<num_pools; i++) {
+	for (i = 0; i < num_pools; i++) {
 	    __D("Forcing free on pool %d\n", i);
 
 	    /* acquire the mutex in case this isn't the last close */
@@ -2160,9 +2223,49 @@ int __init cmem_init(void)
 	nblocks++;
     }
 
-    /* init CMA pool busylist */
-    INIT_LIST_HEAD(&p_objs[NBLOCKS][0].busylist);
-    INIT_LIST_HEAD(&p_objs[NBLOCKS][0].freelist);
+
+    if (cmem_cma_npools == 0) {
+	/* no explicit pools, assuming global CMA area */
+	__D("no CMEM CMA pools found\n");
+
+	INIT_LIST_HEAD(&p_objs[NBLOCKS][0].busylist);
+	p_objs[NBLOCKS][0].reqsize = 0;
+	p_objs[NBLOCKS][0].size = 0;
+	p_objs[NBLOCKS][0].numbufs = 1;
+
+	heap_pool[NBLOCKS] = 0;
+	npools[NBLOCKS] = 0;
+    }
+    else {
+	__D("%d CMEM CMA pools\n", cmem_cma_npools);
+
+	for (i = 0; i < cmem_cma_npools; i++) {
+	    INIT_LIST_HEAD(&p_objs[NBLOCKS][i].busylist);
+	    p_objs[NBLOCKS][i].reqsize = cmem_cma_p_objs[i].reqsize;
+	    p_objs[NBLOCKS][i].size = cmem_cma_p_objs[i].size;
+	    p_objs[NBLOCKS][i].numbufs = cmem_cma_p_objs[i].numbufs;
+
+	    cmem_cma_dev[i].coherent_dma_mask = DMA_BIT_MASK(32);
+
+	    __D("    pool %d: size=%#x numbufs=%d\n", i,
+	        p_objs[NBLOCKS][i].size, p_objs[NBLOCKS][i].numbufs);
+	}
+
+	if (cmem_cma_heapsize) {
+	    /* already init'ed p_objs in loop above */
+	    heap_pool[NBLOCKS] = cmem_cma_npools - 1;
+	    npools[NBLOCKS] = cmem_cma_npools - 1;
+	}
+	else {
+	    INIT_LIST_HEAD(&p_objs[NBLOCKS][cmem_cma_npools].busylist);
+	    p_objs[NBLOCKS][cmem_cma_npools].reqsize = 0;
+	    p_objs[NBLOCKS][cmem_cma_npools].size = 0;
+	    p_objs[NBLOCKS][cmem_cma_npools].numbufs = 1;
+
+	    heap_pool[NBLOCKS] = cmem_cma_npools;
+	    npools[NBLOCKS] = cmem_cma_npools;
+	}
+    }
 
     /* Create the /proc entry */
     cmem_proc_entry = create_proc_entry("cmem", 0, NULL);
@@ -2227,7 +2330,7 @@ void __exit cmem_exit(void)
 	}
 
 	/* Free the pool structures and empty the lists. */
-	for (i=0; i<num_pools; i++) {
+	for (i = 0; i < num_pools; i++) {
 	    __D("Freeing memory associated with pool %d\n", i);
 
 	    freelistp = &p_objs[bi][i].freelist;
