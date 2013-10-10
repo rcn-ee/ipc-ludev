@@ -32,6 +32,7 @@
 #include <linux/seq_file.h>
 #include <linux/vmalloc.h>
 #include <linux/sched.h>
+#include <linux/slab.h>
 #include <asm/cacheflush.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -2268,10 +2269,7 @@ int __init cmem_init(void)
     }
 
     /* Create the /proc entry */
-    cmem_proc_entry = create_proc_entry("cmem", 0, NULL);
-    if (cmem_proc_entry) {
-	cmem_proc_entry->proc_fops = &cmem_proc_ops;
-    }
+    cmem_proc_entry = proc_create("cmem", 0, NULL, &cmem_proc_ops);
 
     printk(KERN_INFO "cmemk initialized\n");
 
