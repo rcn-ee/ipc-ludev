@@ -86,7 +86,7 @@ static struct vm_struct *ioremap_area;
 static unsigned int block_flags[NBLOCKS] = {0, 0};
 static unsigned long long block_start[NBLOCKS] = {0, 0};
 static unsigned long long block_end[NBLOCKS] = {0, 0};
-static unsigned long block_avail_size[NBLOCKS] = {0, 0};
+static unsigned long long block_avail_size[NBLOCKS] = {0, 0};
 static unsigned int total_num_buffers[NBLOCKS] = {0, 0};
 static unsigned int nblocks = 0;
 
@@ -2024,7 +2024,7 @@ int __init cmem_init(void)
     char *t;
     int pool_size;
     int pool_num_buffers;
-    unsigned long length;
+    unsigned long long length;
     phys_addr_t phys_end_kernel;
     HeapMem_Header *header;
     char *pstart[NBLOCKS];
@@ -2114,8 +2114,9 @@ int __init cmem_init(void)
 	    goto fail_after_create;
 	}
 
-	if ((long)length < 0) {
-	    __E("Negative length of physical memory (%#lx)\n", length);
+	if (block_end[bi] < block_start[bi]) {
+	    __E("phys_end (%#llx) < phys_start (%#llx)\n",
+	        block_end[bi], block_start[bi]);
 	    err = -EINVAL;
 	    goto fail_after_create;
 	}
@@ -2146,11 +2147,11 @@ int __init cmem_init(void)
 
 	/* Initialize the top memory chunk in which to put the pools */
 
-	__D("calling request_mem_region(%#llx, %#lx, \"CMEM\")\n",
+	__D("calling request_mem_region(%#llx, %#llx, \"CMEM\")\n",
 	    block_start[bi], length);
 
 	if (!request_mem_region(block_start[bi], length, "CMEM")) {
-	    __E("Failed to request_mem_region(%#llx, %#lx)\n",
+	    __E("Failed to request_mem_region(%#llx, %#llx)\n",
 	        block_start[bi], length);
 	    err = -EFAULT;
 	    goto fail_after_create;
@@ -2281,7 +2282,7 @@ fail_after_create:
 
     for (bi = 0; bi < NBLOCKS; bi++) {
 	if (block_flags[bi] & BLOCK_MEMREGION) {
-	    __D("calling release_mem_region(%#llx, %#lx)...\n",
+	    __D("calling release_mem_region(%#llx, %#llx)...\n",
 	        block_start[bi], length);
 
 	    release_mem_region(block_start[bi], length);
@@ -2310,7 +2311,7 @@ void __exit cmem_exit(void)
     struct list_head *unext;
     struct pool_buffer *entry;
     struct registered_user *user;
-    unsigned long length;
+    unsigned long long length;
     int num_pools;
     int bi;
     int i;
@@ -2393,7 +2394,7 @@ void __exit cmem_exit(void)
 	length = block_end[bi] - block_start[bi];
 
 	if (block_flags[bi] & BLOCK_MEMREGION) {
-	    __D("calling release_mem_region(%#llx, %#lx)...\n",
+	    __D("calling release_mem_region(%#llx, %#llx)...\n",
 	        block_start[bi], length);
 
 	    release_mem_region(block_start[bi], length);
