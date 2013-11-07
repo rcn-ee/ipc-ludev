@@ -2032,6 +2032,9 @@ int __init cmem_init(void)
     char **pool_table[MAX_POOLS];
     char tmp_str[4];
     void *virtp;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
+    unsigned long num_physpages;
+#endif
 
     banner();
 
@@ -2122,6 +2125,10 @@ int __init cmem_init(void)
 	}
 
 	block_avail_size[bi] = length;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
+	num_physpages = get_num_physpages();
+#endif
 
 	/* attempt to determine the end of Linux kernel memory */
 	phys_end_kernel = virt_to_phys((void *)PAGE_OFFSET) +
