@@ -135,6 +135,25 @@
  * explictily, or by auto-cleanup) does a buffer actually get freed back to
  * the kernel module.
  *
+ * Decoupled allocation & memory mapping
+ * -------------------------------------
+ *
+ * For every CMEM_alloc*() API, there is a corresponding "Phys" API that
+ * returns the physical address of the allocation and does *not* do the
+ * user-space memory mapping (mmap()).  There is also a corresponding
+ * CMEM_freePhys() to be used for freeing allocations performed by the
+ * "Phys" APIs.  The user-space memory mapping is performed with the
+ * CMEM_map()/CMEM_unmap() APIs.  This allows large buffer allocations
+ * without the burden of using up a large portion of the application's
+ * virtual address space for the length of the allocation's existence.
+ * A mapping performed by CMEM_map() doesn't have to be for the whole of
+ * the allocated buffer, it can be for just portions of the buffer (but
+ * must not be larger than the allocated buffer).
+ *
+ * CMEM_map() can be called multiple times for the same physical allocation.
+ * Each invocation of CMEM_map() will allocate a new user virtual address
+ * range for the same physical allocation.
+ *
  * CMA access
  * ----------
  *
@@ -470,6 +489,107 @@ void *CMEM_alloc(size_t size, CMEM_AllocParams *params);
 void *CMEM_alloc2(int blockid, size_t size, CMEM_AllocParams *params);
 
 /**
+ * @brief Allocate unmapped memory from a specified pool.
+ *
+ * @param   poolid  The pool from which to allocate memory.
+ * @param   params  Allocation parameters.
+ *
+ * @remarks @c params->type is ignored - a pool will always be used.
+ * @remarks @c params->alignment is unused, since pool buffers are already
+ *          aligned to specific boundaries.
+ *
+ * @return The physical address of the allocated buffer, or NULL for failure.
+ *
+ * @pre Must have called CMEM_init()
+ *
+ * @sa CMEM_allocPhys()
+ * @sa CMEM_allocPhys2()
+ * @sa CMEM_allocPoolPhys2()
+ * @sa CMEM_freePhys()
+ * @sa CMEM_map()
+ */
+off_t CMEM_allocPoolPhys(int poolid, CMEM_AllocParams *params);
+
+/**
+ * @brief Allocate unmapped memory from a specified pool in a specified
+ *        memory block.
+ *
+ * @param   blockid The memory block from which to allocate.
+ * @param   poolid  The pool from which to allocate memory.
+ * @param   params  Allocation parameters.
+ *
+ * @remarks @c params->type is ignored - a pool will always be used.
+ * @remarks @c params->alignment is unused, since pool buffers are already
+ *          aligned to specific boundaries.
+ *
+ * @return The physical address of the allocated buffer, or NULL for failure.
+ *
+ * @pre Must have called CMEM_init()
+ *
+ * @sa CMEM_allocPhys()
+ * @sa CMEM_allocPhys2()
+ * @sa CMEM_allocPoolPhys()
+ * @sa CMEM_freePhys()
+ * @sa CMEM_map()
+ */
+off_t CMEM_allocPoolPhys2(int blockid, int poolid, CMEM_AllocParams *params);
+
+/**
+ * @brief Allocate unmapped memory of a specified size
+ *
+ * @param   size    The size of the buffer to allocate.
+ * @param   params  Allocation parameters.
+ *
+ * @remarks Used to allocate memory from either a pool, the heap, or the CMA
+ *          global area.
+ *          If doing a pool allocation, the pool that best fits the requested
+ *          size will be selected.  Use CMEM_allocPool() to allocate from a
+ *          specific pool.
+ *          Allocation will be cached or noncached, as specified by params.
+ *          params->alignment valid only for heap allocation.
+ *
+ * @return The physical address of the allocated buffer, or NULL for failure.
+ *
+ * @pre Must have called CMEM_init()
+ *
+ * @sa CMEM_allocPoolPhys()
+ * @sa CMEM_allocPoolPhys2()
+ * @sa CMEM_allocPhys2()
+ * @sa CMEM_freePhys()
+ * @sa CMEM_map()
+ */
+off_t CMEM_allocPhys(size_t size, CMEM_AllocParams *params);
+
+/**
+ * @brief Allocate unmapped memory of a specified size from a specified
+ *        memory block
+ *
+ * @param   blockid The memory block from which to allocate.
+ * @param   size    The size of the buffer to allocate.
+ * @param   params  Allocation parameters.
+ *
+ * @remarks Used to allocate memory from either a pool, the heap, or the CMA
+ *          global area.
+ *          If doing a pool allocation, the pool that best fits the requested
+ *          size will be selected.  Use CMEM_allocPool() to allocate from a
+ *          specific pool.
+ *
+ * @remarks Allocation will be cached or noncached, as specified by params.
+ *          params->alignment valid only for heap allocation.
+ *
+ * @return The physical address of the allocated buffer, or NULL for failure.
+ *
+ * @pre Must have called CMEM_init()
+ *
+ * @sa CMEM_allocPoolPhys()
+ * @sa CMEM_allocPoolPhys2()
+ * @sa CMEM_allocPhys()
+ * @sa CMEM_freePhys()
+ * @sa CMEM_map()
+ */
+off_t CMEM_allocPhys2(int blockid, size_t size, CMEM_AllocParams *params);
+
+/**
  * @brief Register shared usage of an already-allocated buffer
  *
  * @param   physp  Physical address of the already-allocated buffer.
@@ -517,6 +637,29 @@ void *CMEM_registerAlloc(off_t physp);
  * @sa CMEM_unregister()
  */
 int CMEM_free(void *ptr, CMEM_AllocParams *params);
+
+/**
+ * @brief Free an unmapped buffer previously allocated with
+ *        CMEM_allocPhys()/CMEM_allocPoolPhys().
+ *
+ * @param   physp   The physical address of the buffer.
+ * @param   params  Allocation parameters.
+ *
+ * @remarks Use the same CMEM_AllocParams as was used for the allocation.
+ *          params->flags is "don't care".  params->alignment is "don't
+ *          care".
+ *
+ * @return 0 for success or -1 for failure.
+ *
+ * @pre Must have called CMEM_init()
+ *
+ * @sa CMEM_allocPhys()
+ * @sa CMEM_allocPhys2()
+ * @sa CMEM_allocPoolPhys()
+ * @sa CMEM_allocPoolPhys2()
+ * @sa CMEM_unmap()
+ */
+int CMEM_freePhys(off_t physp, CMEM_AllocParams *params);
 
 /**
  * @brief Unregister use of a buffer previously registered with
@@ -567,6 +710,37 @@ off_t CMEM_getPhys(void *ptr);
  * @sa CMEM_cacheWbInv()
  */
 int CMEM_cacheWb(void *ptr, size_t size);
+
+/**
+ * @brief Map allocated memory
+ *
+ * @param   physp   Physical address of the already-allocated buffer.
+ * @param   size    Size in bytes of block to map.
+ *
+ * @return A pointer to the mapped buffer, or NULL for failure.
+ *
+ * @pre Must have called CMEM_init()
+ *
+ * @sa CMEM_allocPhys()
+ * @sa CMEM_allocPoolPhys()
+ * @sa CMEM_unmap()
+ */
+void *CMEM_map(off_t physp, size_t size);
+
+/**
+ * @brief Unmap allocated memory
+ *
+ * @param   userp   User virtual address of the mapped buffer.
+ * @param   size    Size in bytes of block to unmap.
+ *
+ * @return Success/failure boolean value
+ *
+ * @pre Must have called CMEM_init()
+ *
+ * @sa CMEM_freePhys()
+ * @sa CMEM_map()
+ */
+int CMEM_unmap(void *userp, size_t size);
 
 /**
  * @brief Do a cache invalidate of the block pointed to by @c ptr/@c size

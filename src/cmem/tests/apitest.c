@@ -532,6 +532,106 @@ cleanup:
     }
 }
 
+int testMap(int size)
+{
+    int *ptr;
+    int *map_ptr;
+    off_t physp;
+    int ret = 0;
+
+    ptr = CMEM_alloc(size, NULL);
+    printf("testMap: ptr = %p\n", ptr);
+
+    printf("    writing 0xdadaface to *ptr\n");
+    *ptr = 0xdadaface;
+
+    physp = CMEM_getPhys(ptr);
+    map_ptr = CMEM_map(physp, size);
+    if (map_ptr == NULL) {
+	printf("testMap: CMEM_map() failed\n");
+	ret = 1;
+	goto cleanup;
+    }
+    else {
+	printf("testMap: remapped physp %#llx to %p\n",
+		physp, map_ptr);
+	printf("    *map_ptr = 0x%x\n", *map_ptr);
+    }
+
+    if (*map_ptr != 0xdadaface) {
+	printf("testMap: failed, read didn't match write\n");
+	ret = 1;
+    }
+
+    CMEM_unmap(map_ptr, size);
+
+    if (*ptr != 0xdadaface) {
+	printf("testMap: after unmap *ptr != 0xdadaface\n");
+	ret = 1;
+	goto cleanup;
+    }
+    else {
+	printf("testMap: original pointer still good\n");
+    }
+
+    printf("testMap: trying to map too much (0x%x)...\n", size * 0x10);
+    map_ptr = CMEM_map(physp, size * 0x10);
+    if (map_ptr != NULL) {
+	printf("testMap: CMEM_map() should've failed but didn't\n");
+	CMEM_unmap(map_ptr, size * 0x10);
+	ret = 1;
+    }
+
+cleanup:
+    CMEM_free(ptr, NULL);
+
+    return ret;
+}
+
+int testAllocPhys(int size)
+{
+    int *map_ptr;
+    off_t physp;
+    int ret = 0;
+
+    physp = CMEM_allocPhys(size, NULL);
+    map_ptr = CMEM_map(physp, size);
+    if (map_ptr == NULL) {
+	printf("testAllocPhys: CMEM_map() failed\n");
+	ret = 1;
+	goto cleanup;
+    }
+    else {
+	printf("testAllocPhys: mapped physp %#llx to %p\n",
+		physp, map_ptr);
+    }
+
+    printf("    writing 0xdadaface to *map_ptr\n");
+    *map_ptr = 0xdadaface;
+    printf("    *map_ptr = 0x%x\n", *map_ptr);
+
+    if (*map_ptr != 0xdadaface) {
+	printf("testAllocPhys: failed, read didn't match write\n");
+	ret = 1;
+    }
+
+    printf("    unmapping %p\n", map_ptr);
+    CMEM_unmap(map_ptr, size);
+
+    printf("testAllocPhys: trying to map too much (0x%x)...\n", size * 0x10);
+    map_ptr = CMEM_map(physp, size * 0x10);
+    if (map_ptr != NULL) {
+	printf("testAllocPhys: CMEM_map() should've failed but didn't\n");
+	CMEM_unmap(map_ptr, size * 0x10);
+	ret = 1;
+    }
+
+cleanup:
+    CMEM_freePhys(physp, NULL);
+
+    return ret;
+}
+
 int main(int argc, char *argv[])
 {
     int size;
@@ -567,6 +667,9 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     printf("CMEM version = 0x%x\n", version);
+
+    testMap(size);
+    testAllocPhys(size);
 
     testCMA(size);
 

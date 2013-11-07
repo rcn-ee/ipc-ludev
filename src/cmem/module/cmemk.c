@@ -1182,6 +1182,8 @@ alloc:
 		return -ERESTARTSYS;
 	    }
 
+	    size = PAGE_ALIGN(size);
+
 	    if (bi == NBLOCKS) {
 		virtp = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
 
@@ -1846,6 +1848,13 @@ static int mmap(struct file *filp, struct vm_area_struct *vma)
     mutex_unlock(&cmem_mutex);
 
     if (entry != NULL) {
+	if (size > entry->size) {
+	    __E("mmap: requested size %#llx too big (should be <= %#llx)\n",
+	        (unsigned long long)size, (unsigned long long)entry->size);
+
+	    return -EINVAL;
+	}
+
 	if (entry->flags & CMEM_CACHED) {
 	    vma->vm_page_prot = __pgprot(pgprot_val(vma->vm_page_prot) |
                                (L_PTE_MT_WRITETHROUGH | L_PTE_MT_BUFFERABLE));
