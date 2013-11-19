@@ -33,7 +33,7 @@
 
 include products.mak
 
-.PHONY: config config-static config-shared module module_install module_clean
+.PHONY: config config-static config-shared module modules_install modules_clean
 
 config:
 	@echo "Configuring Linux Utils ..."
@@ -51,10 +51,10 @@ config-shared:
             CC=$(TOOLCHAIN_PREFIX)gcc
 
 module:
-	$(MAKE) -C src/cmem/module
+	$(MAKE) -C src/cmem/module ARCH=arm
 
-module_install:
+modules_install:
 	$(MAKE) -C src/cmem/module install
 
-module_clean:
+modules_clean:
 	$(MAKE) -C src/cmem/module clean
