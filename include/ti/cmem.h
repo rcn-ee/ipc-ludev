@@ -219,7 +219,7 @@
 /**
  *  @defgroup   ti_CMEM  Contiguous Memory Manager
  *
- *  This is the API for the Contiguous Memory Manager.
+ *  @copydoc ti/cmem.h
  */
 
 #ifndef ti_CMEM_H
@@ -284,8 +284,8 @@ extern "C" {
  * CMEM_allocPool2(), CMEM_free().
  */
 typedef struct CMEM_AllocParams {
-    int type;		/**< either CMEM_HEAP, CMEM_POOL, or CMEM_CMA */
-    int flags;		/**< either CMEM_CACHED or CMEM_NONCACHED */
+    int type;		/**< either #CMEM_HEAP or #CMEM_POOL */
+    int flags;		/**< either #CMEM_CACHED or #CMEM_NONCACHED */
     size_t alignment;	/**<
                          * only used for heap allocations, must be power of 2
                          */
