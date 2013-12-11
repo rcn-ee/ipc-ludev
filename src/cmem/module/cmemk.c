@@ -645,12 +645,12 @@ static phys_addr_t alloc_pool_buffer(int bi, unsigned int size)
     __D("alloc_pool_buffer: Called for size %u\n", size);
 
     if (size <= block_avail_size[bi]) {
-        __D("alloc_pool_buffer: Fits req %#x < avail: %#lx\n",
+        __D("alloc_pool_buffer: Fits req %#x < avail: %#llx\n",
             size, block_avail_size[bi]);
         block_avail_size[bi] -= size;
         physp = block_start[bi] + block_avail_size[bi];
 
-        __D("alloc_pool_buffer: new available block size is %#lx\n",
+        __D("alloc_pool_buffer: new available block size is %#llx\n",
             block_avail_size[bi]);
 
         __D("alloc_pool_buffer: returning allocated buffer at %#llx\n",
