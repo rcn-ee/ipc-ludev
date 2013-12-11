@@ -44,8 +44,6 @@
 
 #include <ti/cmem.h>
 
-#define __DEBUG
-
 CMEM_AllocParams CMEM_DEFAULTPARAMS = {
     CMEM_POOL,		/* type */
     CMEM_NONCACHED,	/* flags */
@@ -799,4 +797,3 @@ int CMEM_exit(void)
 
     return result;
 }
-
