@@ -632,7 +632,7 @@ void HeapMem_free(int bi, phys_addr_t block, size_t size)
 //    Gate_leaveModule(key);
 }
 
-/* Traverses the page tables and translates a virtual adress to a physical. */
+/* Traverses the page tables and translates a virtual address to a physical. */
 static phys_addr_t get_phys(void *virtp)
 {
     unsigned long virt = (unsigned long)virtp;
@@ -750,7 +750,7 @@ return;
 /*
  *  ======== find_busy_entry ========
  *  find_busy_entry looks for an allocated pool buffer with
- *  phyisical addr physp.
+ *  physical addr physp.
  *
  *  Should be called with the cmem_mutex held.
  */
@@ -2194,7 +2194,7 @@ int __init cmem_init(void)
 	    sprintf(tmp_str, "_%d", bi);
 	    __E("Physical address of 0 not allowed (phys_start%s)\n",
 	        bi == 0 ? "" : tmp_str);
-	    __E("  (minimum phsyical address is %#lx)\n", PAGE_SIZE);
+	    __E("  (minimum physical address is %#lx)\n", PAGE_SIZE);
 	    err = -EINVAL;
 	    goto fail_after_create;
 	}
@@ -2303,12 +2303,12 @@ int __init cmem_init(void)
 	    }
 	}
 	else {
-	    __D(KERN_INFO "no remaining memory for heap, no heap created "
+	    __D("no remaining memory for heap, no heap created "
 	           "for memory block %d\n", bi);
 	    heap_head[bi].next = 0;
 	}
 
-	__D(KERN_INFO "cmem initialized %d pools between %#llx and %#llx\n",
+	__D("cmem initialized %d pools between %#llx and %#llx\n",
 	       npools[bi], block_start[bi], block_end[bi]);
 
 	nblocks++;
