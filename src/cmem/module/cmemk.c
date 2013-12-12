@@ -69,10 +69,10 @@
 #define MAXTYPE(T) ((T) (((T)1 << ((sizeof(T) * 8) - 1) ^ ((T) -1))))
 
 /*
- * Change here for supporting more than 2 blocks.  Also change all
+ * Change here for supporting more than 4 blocks.  Also change all
  * NBLOCKS-based arrays to have NBLOCKS-worth of initialization values.
  */
-#define NBLOCKS 2
+#define NBLOCKS 4
 
 #define BLOCK_IOREMAP    (1 << 0)
 #define BLOCK_MEMREGION  (1 << 1)
@@ -83,11 +83,11 @@
 #endif
 
 static struct vm_struct *ioremap_area;
-static unsigned int block_flags[NBLOCKS] = {0, 0};
-static unsigned long long block_start[NBLOCKS] = {0, 0};
-static unsigned long long block_end[NBLOCKS] = {0, 0};
-static unsigned long long block_avail_size[NBLOCKS] = {0, 0};
-static unsigned int total_num_buffers[NBLOCKS] = {0, 0};
+static unsigned int block_flags[NBLOCKS] = {0, 0, 0, 0};
+static unsigned long long block_start[NBLOCKS] = {0, 0, 0, 0};
+static unsigned long long block_end[NBLOCKS] = {0, 0, 0, 0};
+static unsigned long long block_avail_size[NBLOCKS] = {0, 0, 0, 0};
+static unsigned int total_num_buffers[NBLOCKS] = {0, 0, 0, 0};
 static unsigned int nblocks = 0;
 
 static int cmem_major;
@@ -105,7 +105,7 @@ static char *phys_end = NULL;
 module_param(phys_start, charp, S_IRUGO);
 module_param(phys_end, charp, S_IRUGO);
 
-static int npools[NBLOCKS + 1] = {0, 0, 0};
+static int npools[NBLOCKS + 1] = {0, 0, 0, 0, 0};
 
 static char *pools[MAX_POOLS] = {
     NULL
@@ -115,7 +115,7 @@ MODULE_PARM_DESC(pools,
     "\n\t\t decimal sizes");
 module_param_array(pools, charp, &npools[0], S_IRUGO);
 
-/* cut-and-paste below as part of adding support for more than 2 blocks */
+/* begin block 1 */
 MODULE_PARM_DESC(phys_start_1, "\n\t\t Start Address for Extended CMEM Pool Memory");
 static char *phys_start_1 = NULL;
 MODULE_PARM_DESC(phys_end_1, "\n\t\t End Address for Extended CMEM Pool Memory");
@@ -130,7 +130,43 @@ MODULE_PARM_DESC(pools_1,
     "\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
     "\n\t\t decimal sizes, for Extended CMEM Pool");
 module_param_array(pools_1, charp, &npools[1], S_IRUGO);
-/* cut-and-paste above as part of adding support for more than 2 blocks */
+/* end block 1 */
+
+/* begin block 2 */
+MODULE_PARM_DESC(phys_start_2, "\n\t\t Start Address for Extended CMEM Pool Memory");
+static char *phys_start_2 = NULL;
+MODULE_PARM_DESC(phys_end_2, "\n\t\t End Address for Extended CMEM Pool Memory");
+static char *phys_end_2 = NULL;
+module_param(phys_start_2, charp, S_IRUGO);
+module_param(phys_end_2, charp, S_IRUGO);
+
+static char *pools_2[MAX_POOLS] = {
+    NULL
+};
+MODULE_PARM_DESC(pools_2,
+    "\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
+    "\n\t\t decimal sizes, for Extended CMEM Pool");
+module_param_array(pools_2, charp, &npools[2], S_IRUGO);
+/* end block 2 */
+
+/* cut-and-paste below as part of adding support for more than 4 blocks */
+/* begin block 3 */
+MODULE_PARM_DESC(phys_start_3, "\n\t\t Start Address for Extended CMEM Pool Memory");
+static char *phys_start_3 = NULL;
+MODULE_PARM_DESC(phys_end_3, "\n\t\t End Address for Extended CMEM Pool Memory");
+static char *phys_end_3 = NULL;
+module_param(phys_start_3, charp, S_IRUGO);
+module_param(phys_end_3, charp, S_IRUGO);
+
+static char *pools_3[MAX_POOLS] = {
+    NULL
+};
+MODULE_PARM_DESC(pools_3,
+    "\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
+    "\n\t\t decimal sizes, for Extended CMEM Pool");
+module_param_array(pools_3, charp, &npools[3], S_IRUGO);
+/* end block 3 */
+/* cut-and-paste above as part of adding support for more than 4 blocks */
 
 static int allowOverlap = 0;
 MODULE_PARM_DESC(allowOverlap,
@@ -244,29 +280,37 @@ void HeapMem_free(int bi, phys_addr_t block, size_t size);
  * Heap configuration stuff
  *
  * For CMA global heap allocations, we treat heap_pool[NBLOCKS] as
- * its own block.  For example, if you have 2 physically-specified
- * blocks then NBLOCKS = 2.  heap_pool[0]|[1] are the real blocks, and
- * heap_pool[2] represents the global CMA area.
+ * its own block.  For example, if you have 4 physically-specified
+ * blocks then NBLOCKS = 4.  heap_pool[0]|[1]|[2]|[3] are the real blocks, and
+ * heap_pool[4] represents the global CMA area.
  *
  * Only heap_pool[] gets extended with NBLOCKS + 1 dimension, since the
  * other heap_*[] arrays are used only with the real blocks.  You can't
  * use heap_pool[NBLOCKS] for HeapMem_alloc().
  */
-static int heap_pool[NBLOCKS + 1] = {-1, -1, 0};
+static int heap_pool[NBLOCKS + 1] = {-1, -1, -1, -1, 0};
 
-static unsigned long heap_size[NBLOCKS] = {0, 0};
-static phys_addr_t heap_physp[NBLOCKS] = {0, 0};
+static unsigned long heap_size[NBLOCKS] = {0, 0, 0, 0};
+static phys_addr_t heap_physp[NBLOCKS] = {0, 0, 0, 0};
 static HeapMem_Header heap_head[NBLOCKS] = {
     {
 	0,	/* next */
 	0	/* size */
     },
-/* cut-and-paste below as part of adding support for more than 2 blocks */
     {
 	0,	/* next */
 	0	/* size */
     },
-/* cut-and-paste above as part of adding support for more than 2 blocks */
+    {
+	0,	/* next */
+	0	/* size */
+    },
+/* cut-and-paste below as part of adding support for more than 4 blocks */
+    {
+	0,	/* next */
+	0	/* size */
+    },
+/* cut-and-paste above as part of adding support for more than 4 blocks */
 };
 
 static int map_header(void **vaddrp, phys_addr_t physp, struct vm_struct **vm)
@@ -2055,13 +2099,25 @@ int __init cmem_init(void)
         return -EINVAL;
     }
 
-/* cut-and-paste below as part of adding support for more than 2 blocks */
     if (npools[1] > MAX_POOLS) {
         __E("Too many pools specified (%d) for Block 0, only %d supported.\n",
             npools[1], MAX_POOLS);
         return -EINVAL;
     }
-/* cut-and-paste above as part of adding support for more than 2 blocks */
+
+    if (npools[2] > MAX_POOLS) {
+        __E("Too many pools specified (%d) for Block 0, only %d supported.\n",
+            npools[1], MAX_POOLS);
+        return -EINVAL;
+    }
+
+/* cut-and-paste below as part of adding support for more than 4 blocks */
+    if (npools[3] > MAX_POOLS) {
+        __E("Too many pools specified (%d) for Block 0, only %d supported.\n",
+            npools[1], MAX_POOLS);
+        return -EINVAL;
+    }
+/* cut-and-paste above as part of adding support for more than 4 blocks */
 
     cmem_major = register_chrdev(0, "cmem", &cmem_fxns);
 
@@ -2085,11 +2141,19 @@ int __init cmem_init(void)
     pend[0] = phys_end;
     pool_table[0] = pools;
 
-/* cut-and-paste below as part of adding support for more than 2 blocks */
     pstart[1] = phys_start_1;
     pend[1] = phys_end_1;
     pool_table[1] = pools_1;
-/* cut-and-paste above as part of adding support for more than 2 blocks */
+
+    pstart[2] = phys_start_2;
+    pend[2] = phys_end_2;
+    pool_table[2] = pools_2;
+
+/* cut-and-paste below as part of adding support for more than 4 blocks */
+    pstart[3] = phys_start_3;
+    pend[3] = phys_end_3;
+    pool_table[3] = pools_3;
+/* cut-and-paste above as part of adding support for more than 4 blocks */
 
     for (bi = 0; bi < NBLOCKS; bi++) {
 
@@ -2106,11 +2170,20 @@ int __init cmem_init(void)
 		break;
 	    }
 	}
-/* cut-and-paste below as part of adding support for more than 2 blocks */
+
 	if (bi == 1 && (!phys_start_1 || !phys_end_1)) {
 	    continue;
 	}
-/* cut-and-paste above as part of adding support for more than 2 blocks */
+
+	if (bi == 2 && (!phys_start_2 || !phys_end_2)) {
+	    continue;
+	}
+
+/* cut-and-paste below as part of adding support for more than 4 blocks */
+	if (bi == 3 && (!phys_start_3 || !phys_end_3)) {
+	    continue;
+	}
+/* cut-and-paste above as part of adding support for more than 4 blocks */
 
 	/* Get the start and end of CMEM memory */
 	block_start[bi] = PAGE_ALIGN(simple_strtoll(pstart[bi], NULL, 16));
@@ -2693,4 +2766,3 @@ v7_dma_unmap_area:\n \
 #endif /* CONFIG_CPU_ARM926T */
 
 #endif /* !defined(MULTI_CACHE) */
-
