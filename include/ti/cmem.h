@@ -86,9 +86,9 @@
  * 0, cmemk.ko insertion will fail when this condition is detected.  The
  * overlap detection is fairly crude, however, checking only that the end of
  * the kernel's memory (assigned by way of the u-boot 'bootargs' parameter
- * "mem=##M") is not above the beginning location of a CMEM memory block.  For
+ * "mem=") is not above the beginning location of a CMEM memory block.  For
  * example, on most TI processor-based systems the kernel's memory starts at
- * 0x80000000 and ends at (0x80000000 + ##M), so a CMEM block starting at
+ * 0x80000000 and ends at (0x80000000+), so a CMEM block starting at
  * 0x1000 would be detected as overlapping since the beginning location of that
  * block is not greater than the end location of the kernel's memory.  To
  * allow this situation, cmemk.ko should be inserted using "allowOverlap=1".
@@ -182,7 +182,7 @@
  * separated list).
  *
  * The CMEM builtin kernel stub is located in
- *     <linuxutils>/src/cmem/module/kernel/drivers/cmem/cmemk_stub.c
+ *     .../src/cmem/module/kernel/drivers/cmem/cmemk_stub.c
  * You don't need this stub if you want to allocate only from the CMA
  * global area.  Please see comments at the head of the above file for
  * instructions on how to incorporate it into your kernel.
@@ -196,8 +196,9 @@
  * regions (or, in this case, pools) according to the size of buffers that
  * will be allocated in order to reduce fragmentation and wasted memory due
  * to size-based alignment padding.  In other words, if your system will be
- * allocating buffers of sizes 4096, 131072, and 1048576, create pools of
- *     cmem_cma_pools=<n1>x4096,<n2>x131072,<n3>x1048576
+ * allocating 10 buffers of size 4096, 8 of size 131072, and 4 of size
+ * 1048576, create pools of
+ *     cmem_cma_pools=10x4096,8x131072,4x1048576
  * and perform allocations from the respective pool.
  *
  * An application doesn't need to know the pool IDs that correspond to the
