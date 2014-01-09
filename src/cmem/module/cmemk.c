@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2007-2013 Texas Instruments Incorporated - http://www.ti.com
+ *  Copyright (C) 2007-2014 Texas Instruments Incorporated - http://www.ti.com
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -191,7 +191,7 @@ typedef struct pool_buffer {
     phys_addr_t physp;
     int flags;			/* CMEM_CACHED or CMEM_NONCACHED */
     void *kvirtp;		/* used only for CMA-based allocs */
-    size_t size;		/* used only for heap-based allocs */
+    unsigned long long size;	/* used only for heap-based allocs */
     struct device *dev;		/* used only for CMA-based allocs */
 } pool_buffer;
 
@@ -213,8 +213,8 @@ typedef struct pool_object {
     struct list_head freelist;
     struct list_head busylist;
     unsigned int numbufs;
-    unsigned int size;
-    unsigned int reqsize;
+    unsigned long long size;
+    unsigned long long reqsize;
 } pool_object;
 
 static int cmem_cma_npools = 0;
@@ -682,14 +682,14 @@ static phys_addr_t get_phys(void *virtp)
 }
 
 /* Allocates space from the top "highmem" contiguous buffer for pool buffer. */
-static phys_addr_t alloc_pool_buffer(int bi, unsigned int size)
+static phys_addr_t alloc_pool_buffer(int bi, unsigned long long size)
 {
     phys_addr_t physp;
 
-    __D("alloc_pool_buffer: Called for size %u\n", size);
+    __D("alloc_pool_buffer: Called for size %llu\n", size);
 
     if (size <= block_avail_size[bi]) {
-        __D("alloc_pool_buffer: Fits req %#x < avail: %#llx\n",
+        __D("alloc_pool_buffer: Fits req %#llx < avail: %#llx\n",
             size, block_avail_size[bi]);
         block_avail_size[bi] -= size;
         physp = block_start[bi] + block_avail_size[bi];
@@ -952,8 +952,8 @@ static void *cmem_seq_next(struct seq_file *s, void *v, loff_t *pos)
 
 int show_busy_banner(int bi, struct seq_file *s, int n)
 {
-    return seq_printf(s, "\nBlock %d: Pool %d: %d bufs size %d (%d requested)\n"
-		      "\nPool %d busy bufs:\n",
+    return seq_printf(s, "\nBlock %d: Pool %d: %d bufs size %lld"
+                      " (%lld requested)\n\nPool %d busy bufs:\n",
                       bi, n, p_objs[bi][n].numbufs, p_objs[bi][n].size,
                       p_objs[bi][n].reqsize, n);
 }
@@ -1069,16 +1069,16 @@ static int cmem_proc_open(struct inode *inode, struct file *file)
 }
 
 /* Allocate a contiguous memory pool. */
-static int alloc_pool(int bi, int idx, int num, int reqsize, phys_addr_t *physpRet)
+static int alloc_pool(int bi, int idx, int num, unsigned long long reqsize, phys_addr_t *physpRet)
 {
     struct pool_buffer *entry;
     struct list_head *freelistp = &p_objs[bi][idx].freelist;
     struct list_head *busylistp = &p_objs[bi][idx].busylist;
-    int size = PAGE_ALIGN(reqsize);
+    unsigned long long size = PAGE_ALIGN(reqsize);
     phys_addr_t physp;
     int i;
 
-    __D("Allocating %d buffers of size %d (requested %d)\n",
+    __D("Allocating %d buffers of size %llu (requested %llu)\n",
                 num, size, reqsize);
 
     p_objs[bi][idx].reqsize = reqsize;
@@ -1099,7 +1099,7 @@ static int alloc_pool(int bi, int idx, int num, int reqsize, phys_addr_t *physpR
         physp = alloc_pool_buffer(bi, size);
 
         if (physp == 0) {
-            __E("alloc_pool failed to get contiguous area of size %d\n",
+            __E("alloc_pool failed to get contiguous area of size %llu\n",
                 size);
 
             /*
@@ -1121,7 +1121,7 @@ static int alloc_pool(int bi, int idx, int num, int reqsize, phys_addr_t *physpR
             *physpRet++ = physp;
         }
 
-        __D("Allocated buffer %d, physical %#llx and size %#x\n",
+        __D("Allocated buffer %d, physical %#llx and size %#llx\n",
             entry->id, (unsigned long long)entry->physp, size);
 
         list_add_tail(&entry->element, freelistp);
@@ -2075,7 +2075,7 @@ int __init cmem_init(void)
     int i;
     int err;
     char *t;
-    int pool_size;
+    unsigned long long pool_size;
     int pool_num_buffers;
     unsigned long long length;
     phys_addr_t phys_end_kernel;
@@ -2263,10 +2263,10 @@ int __init cmem_init(void)
 		err = -EINVAL;
 		goto fail_after_create;
 	    }
-	    pool_size = simple_strtol(t, NULL, 10);
+	    pool_size = simple_strtoll(t, NULL, 10);
 
 	    if (alloc_pool(bi, i, pool_num_buffers, pool_size, NULL) < 0) {
-		__E("Failed to alloc pool of size %d and number of buffers %d\n",
+		__E("Failed to alloc pool of size %llu and number of buffers %d\n",
 		    pool_size, pool_num_buffers);
 		err = -ENOMEM;
 		goto fail_after_create;
