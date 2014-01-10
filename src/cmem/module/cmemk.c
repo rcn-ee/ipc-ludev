@@ -749,12 +749,12 @@ return;
 
 /*
  *  ======== find_busy_entry ========
- *  find_busy_entry looks for an allocated pool buffer with
- *  physical addr physp.
+ *  find_busy_entry looks for an allocated pool buffer containing
+ *  physical addr physp -> (physp + *sizep).
  *
  *  Should be called with the cmem_mutex held.
  */
-static struct pool_buffer *find_busy_entry(phys_addr_t physp, int *poolp, struct list_head **ep, int *bip)
+static struct pool_buffer *find_busy_entry(phys_addr_t physp, int *poolp, struct list_head **ep, int *bip, size_t *sizep)
 {
     struct list_head *busylistp;
     struct list_head *e;
@@ -775,7 +775,13 @@ static struct pool_buffer *find_busy_entry(phys_addr_t physp, int *poolp, struct
 
 	    for (e = busylistp->next; e != busylistp; e = e->next) {
 		entry = list_entry(e, struct pool_buffer, element);
-		if (entry->physp == physp) {
+		if ((!sizep && entry->physp == physp) ||
+		     (sizep &&
+		       (physp >= entry->physp &&
+		         (physp + *sizep) <= (entry->physp + entry->size)
+		       )
+		     )
+		   ) {
 		    if (poolp) {
 			*poolp = i;
 		    }
@@ -1417,7 +1423,7 @@ alloc:
 
 	    size = 0;
 
-	    entry = find_busy_entry(physp, &pool, &e, &bi);
+	    entry = find_busy_entry(physp, &pool, &e, &bi, NULL);
 	    if (entry) {
 		/* record values in case entry gets kfree()'d for CMEM_HEAP */
 		id = entry->id;
@@ -1701,7 +1707,7 @@ alloc:
 	    if (mutex_lock_interruptible(&cmem_mutex)) {
 		return -ERESTARTSYS;
 	    }
-	    entry = find_busy_entry(physp, &pool, &e, &bi);
+	    entry = find_busy_entry(physp, &pool, &e, &bi, &block.size);
             mutex_unlock(&cmem_mutex);
 	    if (!entry) {
                 __E("CACHE%s%s: Failed to find allocated buffer at virtual 0x%p\n",
@@ -1833,7 +1839,7 @@ alloc:
 		return -ERESTARTSYS;
 	    }
 
-	    entry = find_busy_entry(physp, &pool, &e, &bi);
+	    entry = find_busy_entry(physp, &pool, &e, &bi, NULL);
 	    if (entry) {
 		/*
 		 * Should we check if the "current" process is already on
@@ -1888,7 +1894,7 @@ static int mmap(struct file *filp, struct vm_area_struct *vma)
 	return -ERESTARTSYS;
     }
 
-    entry = find_busy_entry(physp, NULL, NULL, NULL);
+    entry = find_busy_entry(physp, NULL, NULL, NULL, &size);
     mutex_unlock(&cmem_mutex);
 
     if (entry != NULL) {
