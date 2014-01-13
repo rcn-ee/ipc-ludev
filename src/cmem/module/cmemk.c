@@ -1514,22 +1514,27 @@ alloc:
 #ifdef __DEBUG
             dump_lists(bi, pool);
 #endif
-	    if (pool == heap_pool[bi]) {
-		allocDesc.free_outparams.size = size;
+	    if (cmd & CMEM_PHYS) {
+		__D("FREE%sPHYS: returning\n", cmd & CMEM_HEAP ? "HEAP" : "");
 	    }
 	    else {
-		allocDesc.free_outparams.size = p_objs[bi][pool].size;
-	    }
-	    allocDesc.free_outparams.poolid = pool;
-	    if (copy_to_user(argp, &allocDesc, sizeof(allocDesc))) {
-                return -EFAULT;
-            }
+		    if (pool == heap_pool[bi]) {
+			allocDesc.free_outparams.size = size;
+		    }
+		    else {
+			allocDesc.free_outparams.size = p_objs[bi][pool].size;
+		    }
+		    allocDesc.free_outparams.poolid = pool;
+		    if (copy_to_user(argp, &allocDesc, sizeof(allocDesc))) {
+			return -EFAULT;
+		    }
 
-            __D("FREE%s%s: returning size %d, poolid %d\n",
-	        cmd & CMEM_HEAP ? "HEAP" : "",
-	        cmd & CMEM_PHYS ? "PHYS" : "",
-		allocDesc.free_outparams.size,
-		allocDesc.free_outparams.poolid);
+		    __D("FREE%s%s: returning size %d, poolid %d\n",
+			cmd & CMEM_HEAP ? "HEAP" : "",
+			cmd & CMEM_PHYS ? "PHYS" : "",
+			allocDesc.free_outparams.size,
+			allocDesc.free_outparams.poolid);
+	    }
 
             break;
 
