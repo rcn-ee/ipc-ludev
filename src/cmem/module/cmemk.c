@@ -1165,7 +1165,8 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
     dma_addr_t dma = 0;
     size_t reqsize, align;
     size_t size = 0;
-    int delta = MAXTYPE(int);
+    unsigned long long lsize, lreqsize;
+    unsigned long long delta = MAXTYPE(unsigned long long);
     int pool = -1;
     int i;
     int bi;
@@ -1290,7 +1291,7 @@ alloc:
 	    }
 
             __D("ALLOCHEAP%s: allocated %#x size buffer at %#llx (phys address)\n",
-	        cmd & CMEM_CACHED ? "CACHED" : "", entry->size,
+	        cmd & CMEM_CACHED ? "CACHED" : "", (size_t)entry->size,
 	        (unsigned long long)entry->physp);
 
 	    break;
@@ -1327,7 +1328,7 @@ alloc:
             }
 
 	    if (bi == NBLOCKS) {
-		size = p_objs[bi][pool].size;
+		lsize = p_objs[bi][pool].size;
 		dev = &cmem_cma_dev[pool];
 		align = 0;
 		pool_alloc = 1;
@@ -1427,7 +1428,7 @@ alloc:
 	    if (entry) {
 		/* record values in case entry gets kfree()'d for CMEM_HEAP */
 		id = entry->id;
-		size = entry->size;
+		size = (size_t)entry->size;
 
 		registeredlistp = &entry->users;
 		u = registeredlistp->next;
@@ -1483,11 +1484,11 @@ alloc:
 			}
 
 			if (bi == NBLOCKS) {
-			    dma_free_coherent(entry->dev, entry->size,
+			    dma_free_coherent(entry->dev, (size_t)entry->size,
 			                      entry->kvirtp, entry->dma);
 			}
 			else {
-			    HeapMem_free(bi, entry->physp, entry->size);
+			    HeapMem_free(bi, entry->physp, (size_t)entry->size);
 			}
 			list_del(e);
 			kfree(entry);
@@ -1594,7 +1595,7 @@ alloc:
             if (put_user(p_objs[bi][pool].size, argp)) {
                 return -EFAULT;
             }
-            __D("GETSIZE returning %d\n", p_objs[bi][pool].size);
+            __D("GETSIZE returning %#llx\n", p_objs[bi][pool].size);
             break;
 
         /*
@@ -1607,7 +1608,7 @@ alloc:
                 return -EFAULT;
             }
 
-	    reqsize = allocDesc.get_pool_inparams.size;
+	    lreqsize = allocDesc.get_pool_inparams.size;
 	    bi = allocDesc.get_pool_inparams.blockid;
 
 	    if (bi == CMEM_CMABLOCKID) {
@@ -1624,28 +1625,29 @@ alloc:
 		return -ERESTARTSYS;
 	    }
 
-            __D("GETPOOL: Trying to find a pool to fit size %d\n", reqsize);
+            __D("GETPOOL: Trying to find a pool to fit size %#llx\n", lreqsize);
             for (i = 0; i < npools[bi]; i++) {
-                size = p_objs[bi][i].size;
+                lsize = p_objs[bi][i].size;
                 freelistp = &p_objs[bi][i].freelist;
 
-                __D("GETPOOL: size (%d) > reqsize (%d)?\n", size, reqsize);
-                if (size >= reqsize) {
-                    __D("GETPOOL: delta (%d) < olddelta (%d)?\n",
-                        size - reqsize, delta);
-                    if ((size - reqsize) < delta) {
+                __D("GETPOOL: size (%#llx) > reqsize (%#llx)?\n",
+		    lsize, lreqsize);
+                if (lsize >= lreqsize) {
+                    __D("GETPOOL: delta (%#llx) < olddelta (%#llx)?\n",
+                        lsize - lreqsize, delta);
+                    if ((lsize - lreqsize) < delta) {
                         if (bi < NBLOCKS) {
 			    if (!list_empty(freelistp)) {
-				delta = size - reqsize;
+				delta = lsize - lreqsize;
 				pool = i;
-				__D("GETPOOL: Found a best fit delta %d in pool %d\n",
+				__D("GETPOOL: Found a best fit delta %#llx in pool %d\n",
 				    delta, pool);
 			    }
                         }
 			else {
-			    delta = size - reqsize;
+			    delta = lsize - lreqsize;
 			    pool = i;
-			    __D("GETPOOL: Found a best fit delta %d in CMA block\n",
+			    __D("GETPOOL: Found a best fit delta %#llx in CMA block\n",
 				    delta);
                         }
                     }
@@ -1656,6 +1658,7 @@ alloc:
 		if (useHeapIfPoolUnavailable) {
 		    /* no pool buffer available, try heap */
 
+		    reqsize = lreqsize;
 		    physp = HeapMem_alloc(bi, reqsize, HEAP_ALIGN, DRYRUN);
 		    if (physp != 0) {
 			/*
@@ -1675,7 +1678,7 @@ alloc:
             mutex_unlock(&cmem_mutex);
 
 	    if (pool == -1) {
-		__E("Failed to find a pool which fits %d\n", reqsize);
+		__E("Failed to find a pool which fits %#llx\n", lreqsize);
 
 		return -ENOMEM;
             }
@@ -1814,7 +1817,7 @@ alloc:
 	                                         block_start[bi];
 
             __D("GETBLOCK: returning phys base "
-	        "%#llx, size %#x.\n", allocDesc.get_block_outparams.physp,
+	        "%#llx, size %#llx.\n", allocDesc.get_block_outparams.physp,
                 allocDesc.get_block_outparams.size);
 
 	    if (copy_to_user(argp, &allocDesc, sizeof(allocDesc))) {
@@ -1886,11 +1889,12 @@ static int mmap(struct file *filp, struct vm_area_struct *vma)
 {
     phys_addr_t physp;
     struct pool_buffer *entry;
-    size_t size = vma->vm_end - vma->vm_start;
+    unsigned long size = vma->vm_end - vma->vm_start;
+    size_t s;
 
     __D("mmap: vma->vm_start     = %#lx\n", vma->vm_start);
     __D("mmap: vma->vm_end       = %#lx\n", vma->vm_end);
-    __D("mmap: size              = %#llx\n", (unsigned long long)size);
+    __D("mmap: size              = %#lx\n", size);
     __D("mmap: vma->vm_pgoff     = %#lx\n", vma->vm_pgoff);
 
     physp = (unsigned long long)vma->vm_pgoff << PAGE_SHIFT;
@@ -1899,7 +1903,8 @@ static int mmap(struct file *filp, struct vm_area_struct *vma)
 	return -ERESTARTSYS;
     }
 
-    entry = find_busy_entry(physp, NULL, NULL, NULL, &size);
+    s = size;
+    entry = find_busy_entry(physp, NULL, NULL, NULL, &s);
     mutex_unlock(&cmem_mutex);
 
     if (entry != NULL) {
@@ -2349,7 +2354,7 @@ int __init cmem_init(void)
 
 	    cmem_cma_dev[i].coherent_dma_mask = DMA_BIT_MASK(32);
 
-	    __D("    pool %d: size=%#x numbufs=%d\n", i,
+	    __D("    pool %d: size=%#llx numbufs=%d\n", i,
 	        p_objs[NBLOCKS][i].size, p_objs[NBLOCKS][i].numbufs);
 	}
 

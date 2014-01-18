@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2013 Texas Instruments Incorporated - http://www.ti.com
+ * Copyright (c) 2007-2014 Texas Instruments Incorporated - http://www.ti.com
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -296,7 +296,7 @@ extern CMEM_AllocParams CMEM_DEFAULTPARAMS;
 
 typedef struct CMEM_BlockAttrs {
     off_t phys_base;
-    size_t size;
+    unsigned long long size;
 } CMEM_BlockAttrs;
 
 /** @cond INTERNAL */
@@ -318,16 +318,16 @@ union CMEM_AllocUnion {
 	int blockid;
     } get_size_inparams;	/**< */
     struct {			/**< */
-	size_t size;
+	unsigned long long size;
 	int blockid;
     } get_pool_inparams;	/**< */
     struct {			/**< */
 	unsigned long long physp;
-	size_t size;
+	unsigned long long size;
     } alloc_pool_outparams;	/**< */
     struct {			/**< */
 	unsigned long long physp;
-	size_t size;
+	unsigned long long size;
     } get_block_outparams;	/**< */
     struct {			/**< */
 	int poolid;
@@ -366,7 +366,7 @@ int CMEM_init(void);
  * @sa CMEM_free()
  * @sa CMEM_getPool2()
  */
-int CMEM_getPool(size_t size);
+int CMEM_getPool(unsigned long long size);
 
 /**
  * @brief Find the pool in memory block blockid that best fits a given
@@ -384,7 +384,7 @@ int CMEM_getPool(size_t size);
  * @sa CMEM_free()
  * @sa CMEM_getPool()
  */
-int CMEM_getPool2(int blockid, size_t size);
+int CMEM_getPool2(int blockid, unsigned long long size);
 
 /**
  * @brief Allocate memory from a specified pool.
@@ -797,7 +797,7 @@ int CMEM_getVersion(void);
  * @sa  CMEM_getBlockAttrs()
  * @sa  CMEM_getNumBlocks()
  */
-int CMEM_getBlock(off_t *pphys_base, size_t *psize);
+int CMEM_getBlock(off_t *pphys_base, unsigned long long *psize);
 
 /**
  * @brief Retrieve extended memory block attributes from CMEM driver

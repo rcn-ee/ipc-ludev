@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2013 Texas Instruments Incorporated - http://www.ti.com
+ * Copyright (c) 2007-2014 Texas Instruments Incorporated - http://www.ti.com
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -67,7 +67,7 @@ struct block_struct {
 static int cmem_fd = -2;
 static int ref_count = 0;
 
-static void *getAndAllocFromPool(int blockid, size_t size, CMEM_AllocParams *params, off_t *physp);
+static void *getAndAllocFromPool(int blockid, unsigned long long size, CMEM_AllocParams *params, off_t *physp);
 static void *allocFromHeap(int blockid, size_t size, CMEM_AllocParams *params, off_t *physp);
 static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params, off_t *physp);
 
@@ -158,7 +158,8 @@ static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params, of
     union CMEM_AllocUnion allocDesc;
     off_t phys;
     void *userp;
-    size_t size;
+    unsigned long long size;
+    size_t map_size;
     unsigned int cmd;
     int rv;
 
@@ -179,7 +180,7 @@ static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params, of
     phys = (off_t)allocDesc.alloc_pool_outparams.physp;
     size = allocDesc.alloc_pool_outparams.size;
 
-    __D("allocPool: allocated phys buffer %#llx, size %#x\n",
+    __D("allocPool: allocated phys buffer %#llx, size %#llx\n",
         (unsigned long long)phys, size);
 
     /* non-NULL physp means "don't map", return NULL since no virt ptr */
@@ -188,13 +189,22 @@ static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params, of
 	return NULL;
     }
 
+    map_size = (size_t)size;
+    if (map_size != size) {
+        __E("allocPool: returned pool buffer too big for mmap (size %#llx)\n",
+            size);
+        __E("    Freeing phys buffer %#llx\n", (unsigned long long)phys);
+        ioctl(cmem_fd, CMEM_IOCFREEPHYS | CMEM_IOCMAGIC , &phys);
+        return NULL;
+    }
+
     /* Map the physical address to user space */
     userp = mmap(0,                       // Preferred start address
-                 size,                    // Length to be mapped
+                 map_size,                // Length to be mapped
                  PROT_WRITE | PROT_READ,  // Read and write access
                  MAP_SHARED,              // Shared memory
                  cmem_fd,                 // File descriptor
-                 phys);                  // The byte offset from fd
+                 phys);                   // The byte offset from fd
 
     if (userp == MAP_FAILED) {
         __E("allocPool: Failed to mmap buffer at physical address %#llx\n",
@@ -209,7 +219,7 @@ static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params, of
     return userp;
 }
 
-static void *getAndAllocFromPool(int blockid, size_t size, CMEM_AllocParams *params, off_t *physp)
+static void *getAndAllocFromPool(int blockid, unsigned long long size, CMEM_AllocParams *params, off_t *physp)
 {
     int poolid;
 
@@ -223,7 +233,7 @@ static void *getAndAllocFromPool(int blockid, size_t size, CMEM_AllocParams *par
 	return NULL;
     }
     if (poolid == -2) {
-	return allocFromHeap(blockid, size, params, physp);
+	return allocFromHeap(blockid, (size_t)size, params, physp);
     }
     else {
 	return allocFromPool(blockid, poolid, params, physp);
@@ -316,7 +326,7 @@ static void *alloc(int blockid, size_t size, CMEM_AllocParams *params, off_t *ph
     }
 
     if (params->type == CMEM_POOL) {
-	return getAndAllocFromPool(blockid, size, params, physp);
+	return getAndAllocFromPool(blockid, (unsigned long long)size, params, physp);
     }
     else {
 	return allocFromHeap(blockid, size, params, physp);
@@ -554,7 +564,7 @@ int CMEM_unregister(void *ptr, CMEM_AllocParams *params)
     return CMEM_free(ptr, params);
 }
 
-static int getPoolFromBlock(int blockid, size_t size)
+static int getPoolFromBlock(int blockid, unsigned long long size)
 {
     union CMEM_AllocUnion poolDesc;
 
@@ -565,7 +575,7 @@ static int getPoolFromBlock(int blockid, size_t size)
     poolDesc.get_pool_inparams.size = size;
     poolDesc.get_pool_inparams.blockid = blockid;
     if (ioctl(cmem_fd, CMEM_IOCGETPOOL | CMEM_IOCMAGIC, &poolDesc) == -1) {
-        __E("getPool: Failed to get a pool fitting a size %d\n", size);
+        __E("getPool: Failed to get a pool fitting a size %#llx\n", size);
         return -1;
     }
 
@@ -575,16 +585,16 @@ static int getPoolFromBlock(int blockid, size_t size)
     return poolDesc.poolid;
 }
 
-int CMEM_getPool(size_t size)
+int CMEM_getPool(unsigned long long size)
 {
-    __D("getPool: entered w/ size %#x\n", size);
+    __D("getPool: entered w/ size %#llx\n", size);
 
     return getPoolFromBlock(0, size);
 }
 
-int CMEM_getPool2(int blockid, size_t size)
+int CMEM_getPool2(int blockid, unsigned long long size)
 {
-    __D("getPool2: entered w/ size %#x\n", size);
+    __D("getPool2: entered w/ size %#llx\n", size);
 
     return getPoolFromBlock(blockid, size);
 }
@@ -706,7 +716,7 @@ int CMEM_getVersion(void)
     return version;
 }
 
-static int getBlock(int blockid, off_t *pphys_base, size_t *psize)
+static int getBlock(int blockid, off_t *pphys_base, unsigned long long *psize)
 {
     union CMEM_AllocUnion block;
     int rv;
@@ -730,13 +740,13 @@ static int getBlock(int blockid, off_t *pphys_base, size_t *psize)
     *psize = block.get_block_outparams.size;
 
     __D("getBlock: exiting, ioctl CMEM_IOCGETBLOCK succeeded, "
-        "returning *pphys_base=%#llx, *psize=%#x\n",
+        "returning *pphys_base=%#llx, *psize=%#llx\n",
         (unsigned long long)(*pphys_base), *psize);
 
     return 0;
 }
 
-int CMEM_getBlock(off_t *pphys_base, size_t *psize)
+int CMEM_getBlock(off_t *pphys_base, unsigned long long *psize)
 {
     return getBlock(0, pphys_base, psize);
 }
@@ -758,7 +768,7 @@ int CMEM_getNumBlocks(int *pnblocks)
 
     rv = ioctl(cmem_fd, CMEM_IOCGETNUMBLOCKS | CMEM_IOCMAGIC, pnblocks);
     if (rv != 0) {
-	__E("getBlock: Failed to retrieve number of blocks "
+	__E("getNumBlocks: Failed to retrieve number of blocks "
             "from driver: %d.\n", rv);
 
 	return -1;

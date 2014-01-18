@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2013 Texas Instruments Incorporated - http://www.ti.com
+ * Copyright (c) 2007-2014 Texas Instruments Incorporated - http://www.ti.com
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,7 +54,7 @@
 unsigned int *ptrs[NUMHEAPPTRS];
 int nblocks;
 
-int writereadCMA(int size)
+int writereadCMA(size_t size)
 {
     int rv;
     int i;
@@ -107,7 +107,7 @@ int writereadCMA(int size)
     return 0;
 }
 
-void testCMA(int size)
+void testCMA(size_t size)
 {
     int rv;
     int num_buffers;
@@ -169,7 +169,7 @@ void testCMA(int size)
 
 }
 
-void testHeap(int size, int block)
+void testHeap(size_t size, int block)
 {
     int rv;
     int num_buffers;
@@ -225,7 +225,7 @@ void testHeap(int size, int block)
     printf("...done\n");
 }
 
-void testPools(int size, int block)
+void testPools(size_t size, int block)
 {
     int rv;
     int num_buffers;
@@ -281,7 +281,7 @@ void testPools(int size, int block)
     printf("...done\n");
 }
 
-void testCache(int size, int block)
+void testCache(size_t size, int block)
 {
     unsigned int *ptr1_nocache = NULL;
     unsigned int *ptr1_cache = NULL;
@@ -324,7 +324,7 @@ void testCache(int size, int block)
            (unsigned long long)physp_nocache);
 
     /* Write some data into this buffer */
-    for (i=0; i < size / sizeof(int) ; i++) {
+    for (i=0; i < size / sizeof(size_t) ; i++) {
         ptr1_nocache[i] = 0xbeefbeef;
     }
 
@@ -356,7 +356,7 @@ void testCache(int size, int block)
            (unsigned long long)physp_cache);
 
     /* Write some data into this buffer */
-    for (i = 0; i < size / sizeof(int); i++) {
+    for (i = 0; i < size / sizeof(size_t); i++) {
         ptr1_cache[i] = 0x0dead1ce;
     }
 
@@ -386,7 +386,7 @@ void testCache(int size, int block)
            (unsigned long long)physp_dma);
 
     /* Initialize DMA source buffer */
-    for (i = 0; i < size / sizeof(int); i++) {
+    for (i = 0; i < size / sizeof(size_t); i++) {
         ptr1_cache[i] = 0x0dead1ce;
     }
 
@@ -399,7 +399,7 @@ void testCache(int size, int block)
 	printf("R-M-W noncached buffer %#llx\n",
 	       (unsigned long long)physp_nocache);
 	gettimeofday(&start_tv, NULL);
-	for (i = 0; i < (size / sizeof(int)); i += 1) {
+	for (i = 0; i < (size / sizeof(size_t)); i += 1) {
 	    ptr1_nocache[i] += 1;
 	}
 	gettimeofday(&end_tv, NULL);
@@ -411,7 +411,7 @@ void testCache(int size, int block)
 
 	printf("R-M-W cached buffer %#llx\n", (unsigned long long)physp_cache);
 	gettimeofday(&start_tv, NULL);
-	for (i = 0; i < (size / sizeof(int)); i += 1) {
+	for (i = 0; i < (size / sizeof(size_t)); i += 1) {
 	    ptr1_cache[i] += 1;
 	}
 	gettimeofday(&end_tv, NULL);
@@ -435,7 +435,7 @@ void testCache(int size, int block)
 
     printf("R-M-W cached buffer %#llx\n", (unsigned long long)physp_cache);
     gettimeofday(&start_tv, NULL);
-    for (i = 0; i < (size / sizeof(int)); i += 1) {
+    for (i = 0; i < (size / sizeof(size_t)); i += 1) {
 	ptr1_cache[i] += 1;
     }
     gettimeofday(&end_tv, NULL);
@@ -485,7 +485,7 @@ void testCache(int size, int block)
            (unsigned long long)physp);
 
     /* Write some data into this buffer */
-    for (i=0; i < size / sizeof(int); i++) {
+    for (i=0; i < size / sizeof(size_t); i++) {
         ptr2[i] = 0xfeebfeeb;
     }
 
@@ -532,7 +532,7 @@ cleanup:
     }
 }
 
-int testMap(int size)
+int testMap(size_t size)
 {
     int *ptr;
     int *map_ptr;
@@ -541,6 +541,11 @@ int testMap(int size)
 
     ptr = CMEM_alloc(size, NULL);
     printf("testMap: ptr = %p\n", ptr);
+
+    if (ptr == NULL) {
+	printf("testMap: CMEM_alloc() failed\n");
+	return 1;
+    }
 
     printf("    writing 0xdadaface to *ptr\n");
     *ptr = 0xdadaface;
@@ -588,7 +593,7 @@ cleanup:
     return ret;
 }
 
-int testAllocPhys(int size)
+int testAllocPhys(size_t size)
 {
     int *map_ptr;
     off_t physp;
@@ -634,7 +639,7 @@ cleanup:
 
 int main(int argc, char *argv[])
 {
-    int size;
+    size_t size;
     int version;
     CMEM_BlockAttrs attrs;
     int i;
@@ -685,7 +690,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Failed to retrieve CMEM memory block %d bounds\n", i);
 	    }
 	    else {
-		printf("CMEM memory block %d: phys start = %#llx, size = %#x\n",
+		printf("CMEM memory block %d: phys start = %#llx, size = %#llx\n",
 		       i, (unsigned long long)attrs.phys_base, attrs.size);
 	    }
 
