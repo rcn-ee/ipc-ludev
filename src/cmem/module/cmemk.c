@@ -2082,7 +2082,6 @@ static void banner(void)
            (LINUX_VERSION_CODE & 0x0000ff00) >> 8,
            (LINUX_VERSION_CODE & 0x000000ff) >> 0
           );
-    printk(KERN_INFO "  File " __FILE__ "\n");
 }
 
 int __init cmem_init(void)
