@@ -263,6 +263,7 @@ extern "C" {
 #define CMEM_IOCGETBLOCK                9
 #define CMEM_IOCREGUSER                 10
 #define CMEM_IOCGETNUMBLOCKS            11
+#define CMEM_IOCCACHEWBINVALL           12
 /*
  * New ioctl cmds should use integers greater than the largest current cmd
  * in order to not break backward compatibility.
@@ -698,6 +699,19 @@ int CMEM_unregister(void *ptr, CMEM_AllocParams *params);
 off_t CMEM_getPhys(void *ptr);
 
 /**
+ * @brief Do a cache writeback/invalidate of the whole cache
+ *
+ * @return Success/failure boolean value
+ *
+ * @pre Must have called CMEM_init()
+ *
+ * @sa CMEM_cacheWb()
+ * @sa CMEM_cacheInv()
+ * @sa CMEM_cacheWbInv()
+ */
+int CMEM_cacheWbInvAll(void);
+
+/**
  * @brief Do a cache writeback of the block pointed to by @c ptr/@c size
  *
  * @param   ptr     Pointer to block to writeback
@@ -709,6 +723,7 @@ off_t CMEM_getPhys(void *ptr);
  *
  * @sa CMEM_cacheInv()
  * @sa CMEM_cacheWbInv()
+ * @sa CMEM_cacheWbInvAll()
  */
 int CMEM_cacheWb(void *ptr, size_t size);
 
@@ -755,6 +770,7 @@ int CMEM_unmap(void *userp, size_t size);
  *
  * @sa CMEM_cacheWb()
  * @sa CMEM_cacheWbInv()
+ * @sa CMEM_cacheWbInvAll()
  */
 int CMEM_cacheInv(void *ptr, size_t size);
 
@@ -771,6 +787,7 @@ int CMEM_cacheInv(void *ptr, size_t size);
  *
  * @sa CMEM_cacheInv()
  * @sa CMEM_cacheWb()
+ * @sa CMEM_cacheWbInvAll()
  */
 int CMEM_cacheWbInv(void *ptr, size_t size);
 

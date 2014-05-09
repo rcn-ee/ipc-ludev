@@ -1689,6 +1689,12 @@ alloc:
             __D("GETPOOL: returning %d\n", pool);
             break;
 
+        case CMEM_IOCCACHEWBINVALL:
+	    flush_cache_all();
+	    __D("CACHEWBINVALL: flush all cache\n");
+
+	    break;
+
         case CMEM_IOCCACHE:
             __D("CACHE%s%s ioctl received.\n",
 	        cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "");

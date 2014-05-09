@@ -622,6 +622,25 @@ off_t CMEM_getPhys(void *ptr)
     return (off_t)getDesc.physp;
 }
 
+int CMEM_cacheWbInvAll(void)
+{
+    __D("cacheWbInvAll: entered\n");
+
+    if (!validate_init()) {
+	return -1;
+    }
+
+    if (ioctl(cmem_fd, CMEM_IOCCACHEWBINVALL | CMEM_IOCMAGIC, NULL) == -1) {
+        __E("cacheWbInvAll: Failed to writeback/invalidate all\n");
+
+        return -1;
+    }
+
+    __D("cacheWbInvAll: exiting, ioctl CMEM_IOCCACHEWBINVALL succeeded, returning 0\n");
+
+    return 0;
+}
+
 int CMEM_cacheWb(void *ptr, size_t size)
 {
     struct block_struct block;
