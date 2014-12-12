@@ -42,6 +42,10 @@
 
 #include <ti/cmem.h>
 
+#include <linux/of.h>
+#include <linux/of_device.h>
+#include <linux/of_platform.h>
+
 /*
  * USE_MMAPSEM means acquire/release current->mm->mmap_sem around calls
  * to dma_[flush/clean/inv]_range.
@@ -58,8 +62,11 @@
 #define HEAP_ALIGN PAGE_SIZE
 
 
+#define __DEBUG
+
 #ifdef __DEBUG
-#define __D(fmt, args...) printk(KERN_DEBUG "CMEMK Debug: " fmt, ## args)
+//#define __D(fmt, args...) printk(KERN_DEBUG "CMEMK Debug: " fmt, ## args)
+#define __D(fmt, args...) printk("CMEMK Debug: " fmt, ## args)
 #else
 #define __D(fmt, args...)
 #endif
@@ -83,12 +90,14 @@
 #endif
 
 static struct vm_struct *ioremap_area;
+static unsigned int nblocks = 0;
 static unsigned int block_flags[NBLOCKS] = {0, 0, 0, 0};
 static unsigned long long block_start[NBLOCKS] = {0, 0, 0, 0};
 static unsigned long long block_end[NBLOCKS] = {0, 0, 0, 0};
 static unsigned long long block_avail_size[NBLOCKS] = {0, 0, 0, 0};
 static unsigned int total_num_buffers[NBLOCKS] = {0, 0, 0, 0};
-static unsigned int nblocks = 0;
+static int pool_num_buffers[NBLOCKS][MAX_POOLS];
+static unsigned long long pool_size[NBLOCKS][MAX_POOLS];
 
 static int cmem_major;
 static struct proc_dir_entry *cmem_proc_entry;
@@ -167,12 +176,6 @@ MODULE_PARM_DESC(pools_3,
 module_param_array(pools_3, charp, &npools[3], S_IRUGO);
 /* end block 3 */
 /* cut-and-paste above as part of adding support for more than 4 blocks */
-
-static int allowOverlap = 0;
-MODULE_PARM_DESC(allowOverlap,
-    "\n\t\t Set to 1 if cmem range is allowed to overlap memory range"
-    "\n\t\t allocated to kernel physical mem (via mem=xxx)");
-module_param(allowOverlap, int, S_IRUGO);
 
 static int useHeapIfPoolUnavailable = 0;
 MODULE_PARM_DESC(useHeapIfPoolUnavailable,
@@ -686,7 +689,7 @@ static phys_addr_t alloc_pool_buffer(int bi, unsigned long long size)
 {
     phys_addr_t physp;
 
-    __D("alloc_pool_buffer: Called for size %llu\n", size);
+    __D("alloc_pool_buffer: Called for size 0x%llx\n", size);
 
     if (size <= block_avail_size[bi]) {
         __D("alloc_pool_buffer: Fits req %#llx < avail: %#llx\n",
@@ -958,8 +961,8 @@ static void *cmem_seq_next(struct seq_file *s, void *v, loff_t *pos)
 
 int show_busy_banner(int bi, struct seq_file *s, int n)
 {
-    return seq_printf(s, "\nBlock %d: Pool %d: %d bufs size %lld"
-                      " (%lld requested)\n\nPool %d busy bufs:\n",
+    return seq_printf(s, "\nBlock %d: Pool %d: %d bufs size 0x%llx"
+                      " (0x%llx requested)\n\nPool %d busy bufs:\n",
                       bi, n, p_objs[bi][n].numbufs, p_objs[bi][n].size,
                       p_objs[bi][n].reqsize, n);
 }
@@ -1084,7 +1087,7 @@ static int alloc_pool(int bi, int idx, int num, unsigned long long reqsize, phys
     phys_addr_t physp;
     int i;
 
-    __D("Allocating %d buffers of size %llu (requested %llu)\n",
+    __D("Allocating %d buffers of size 0x%llx (requested 0x%llx)\n",
                 num, size, reqsize);
 
     p_objs[bi][idx].reqsize = reqsize;
@@ -1530,7 +1533,7 @@ alloc:
 			return -EFAULT;
 		    }
 
-		    __D("FREE%s%s: returning size %d, poolid %d\n",
+		    __D("FREE%s%s: returning size 0x%x, poolid %d\n",
 			cmd & CMEM_HEAP ? "HEAP" : "",
 			cmd & CMEM_PHYS ? "PHYS" : "",
 			allocDesc.free_outparams.size,
@@ -2090,73 +2093,168 @@ static void banner(void)
           );
 }
 
-int __init cmem_init(void)
+/*
+ * dt_config needs to set:
+ *   block_start[bi]
+ *   block_end[bi]
+ *   npools[bi]
+ *   pool_num_buffers[bi][p]
+ *   pool_size[bi][p]
+ * for blocks specified in DT
+ */
+int dt_config(void)
 {
-    int bi;
-    int i;
-    int err;
-    char *t;
-    unsigned long long pool_size;
-    int pool_num_buffers;
-    unsigned long long length;
-    phys_addr_t phys_end_kernel;
-    HeapMem_Header *header;
+    struct device_node *np, *block, *mem;
+    int ret;
+    u32 tmp[MAX_POOLS * 2];
+    u32 addr;
+    u32 size;
+    int n, p;
+    int num_pools;
+    int num_buffers;
+    int buffer_size;
+    int block_num;
+
+    np = of_find_compatible_node(NULL, NULL, "ti,cmem");
+    if (!np) {
+        __D("no cmem node found in device tree\n");
+	return -ENODEV;
+    }
+
+    __D("found cmem node in device tree, getting child nodes\n");
+
+    if (of_get_available_child_count(np) == 0) {
+	__E("no child block node(s) found\n");
+	return -EINVAL;
+    }
+
+    block = NULL;
+
+    while ((block = of_get_next_available_child(np, block)) != NULL) {
+	__D("got child\n");
+
+	if (of_property_read_u32(block, "reg", &block_num)) {
+	    __E("cmem block has no reg property\n");
+	    return -EINVAL;
+	}
+	if (block_num < 0 || block_num >= NBLOCKS) {
+	    __E("cmem block 'address' (reg property) %d out of range\n"
+	        "  must be 0 -> %d\n", block_num, NBLOCKS - 1);
+	    return -EINVAL;
+	}
+	if (block_start[block_num] != 0) {
+	    __E("cmem block %d already assigned\n", block_num);
+	    return -EINVAL;
+	}
+
+	__D("  looking for memory-region phandle\n");
+
+	mem = of_parse_phandle(block, "memory-region", 0);
+	if (mem) {
+	    __D("got memory-region\n");
+
+	    ret = of_property_read_u32_array(mem, "reg", tmp, 2);
+	    if (ret) {
+		return ret;
+	    }
+	    addr = tmp[0];
+	    size = tmp[1];
+
+	    block_start[block_num] = addr;
+	    block_end[block_num] = addr + size;
+
+	    __D("got addr size: 0x%x 0x%x\n", addr, size);
+
+	    num_pools = 0;
+	    if (of_get_property(block, "cmem-buf-pools", &n) != NULL) {
+		/* n is number of bytes, need multiple of 8 */
+		if ((n % 8) != 0) {
+			__E("bad cmem-buf-pools: must be even number of ints\n");
+			return -EINVAL;
+		}
+
+                num_pools = n / 8;
+	    }
+
+            if (num_pools > MAX_POOLS) {
+		__E("bad cmem-buf-pools: too many pools\n"
+		    "  must be <= %d\n", MAX_POOLS);
+		return -EINVAL;
+	    }
+
+	    __D("num_pools=%d\n", num_pools);
+
+	    npools[block_num] = num_pools;
+	    if (num_pools) {
+		ret = of_property_read_u32_array(block, "cmem-buf-pools",
+					         tmp, n / 4);
+		if (!ret) {
+		    n = 0;
+		    p = 0;
+		    while (num_pools) {
+			num_buffers = tmp[n++];
+			buffer_size = tmp[n++];
+			pool_num_buffers[block_num][p] = num_buffers;
+			pool_size[block_num][p] = buffer_size;
+
+			num_pools--;
+			p++;
+
+			__D("got a pool: %d x 0x%x\n",
+			    num_buffers, buffer_size);
+		    }
+		}
+	    }
+	}
+	else {
+	    __E("no memory-region phandle\n");
+	    return -EINVAL;
+	}
+    }
+
+    return 0;
+}
+
+/*
+ * cl_config needs to set:
+ *   block_start[bi]
+ *   block_end[bi]
+ *   npools[bi]
+ *   pool_num_buffers[bi][p]
+ *   pool_size[bi][p]
+ * for blocks *not* specified in DT that *are* specified on the command line
+ */
+int cl_config(void)
+{
     char *pstart[NBLOCKS];
     char *pend[NBLOCKS];
     char **pool_table[MAX_POOLS];
-    char tmp_str[4];
-    void *virtp;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
-    unsigned long num_physpages;
-#endif
-
-    banner();
-
-    mutex_init(&cmem_mutex);
+    int err = 0;
+    int bi;
+    int i;
+    char *t;
 
     if (npools[0] > MAX_POOLS) {
-        __E("Too many pools specified (%d) for Block 0, only %d supported.\n",
-            npools[0], MAX_POOLS);
-        return -EINVAL;
+	__E("Too many pools specified (%d) for Block 0, only %d supported.\n", npools[0], MAX_POOLS);
+	return -EINVAL;
     }
 
     if (npools[1] > MAX_POOLS) {
-        __E("Too many pools specified (%d) for Block 0, only %d supported.\n",
-            npools[1], MAX_POOLS);
-        return -EINVAL;
+	__E("Too many pools specified (%d) for Block 0, only %d supported.\n", npools[1], MAX_POOLS);
+	return -EINVAL;
     }
 
     if (npools[2] > MAX_POOLS) {
-        __E("Too many pools specified (%d) for Block 0, only %d supported.\n",
-            npools[1], MAX_POOLS);
-        return -EINVAL;
+	__E("Too many pools specified (%d) for Block 0, only %d supported.\n", npools[1], MAX_POOLS);
+	return -EINVAL;
     }
 
 /* cut-and-paste below as part of adding support for more than 4 blocks */
     if (npools[3] > MAX_POOLS) {
-        __E("Too many pools specified (%d) for Block 0, only %d supported.\n",
-            npools[1], MAX_POOLS);
-        return -EINVAL;
+	__E("Too many pools specified (%d) for Block 0, only %d supported.\n", npools[1], MAX_POOLS);
+	return -EINVAL;
     }
 /* cut-and-paste above as part of adding support for more than 4 blocks */
-
-    cmem_major = register_chrdev(0, "cmem", &cmem_fxns);
-
-    if (cmem_major < 0) {
-        __E("Failed to allocate major number.\n");
-        return -ENODEV;
-    }
-
-    __D("Allocated major number: %d\n", cmem_major);
-
-    cmem_class = class_create(THIS_MODULE, "cmem");
-    if (IS_ERR(cmem_class)) {
-        __E("Error creating cmem device class.\n");
-	err = -EIO;
-	goto fail_after_reg;
-    }
-
-    device_create(cmem_class, NULL, MKDEV(cmem_major, 0), NULL, "cmem");
 
     pstart[0] = phys_start;
     pend[0] = phys_end;
@@ -2177,38 +2275,107 @@ int __init cmem_init(void)
 /* cut-and-paste above as part of adding support for more than 4 blocks */
 
     for (bi = 0; bi < NBLOCKS; bi++) {
+	if (!pstart[bi]) {
+	    continue;
+	}
 
-	if (bi == 0 && (!phys_start || !phys_end)) {
-	    if (pools[0]) {
+	if (block_start[bi]) {
+	    __D("block %d specified in DT, ignoring cmd line\n", bi);
+	    continue;
+	}
+
+	/* Get the start and end of CMEM memory */
+	block_start[bi] = PAGE_ALIGN(simple_strtoll(pstart[bi], NULL, 16));
+	block_end[bi] = PAGE_ALIGN(simple_strtoll(pend[bi], NULL, 16));
+
+	/* Parse the pools */
+	for (i = 0; i < npools[bi]; i++) {
+	    t = strsep(&pool_table[bi][i], "x");
+	    if (!t) {
+		err = -EINVAL;
+		goto fail;
+	    }
+	    pool_num_buffers[bi][i] = simple_strtol(t, NULL, 10);
+
+	    t = strsep(&pool_table[bi][i], "\0");
+	    if (!t) {
+		err = -EINVAL;
+		goto fail;
+	    }
+	    pool_size[bi][i] = simple_strtoll(t, NULL, 10);
+	}
+    }
+
+fail:
+    return err;
+}
+
+int __init cmem_init(void)
+{
+    int bi;
+    int i;
+    int err;
+    unsigned long long length;
+    HeapMem_Header *header;
+    char tmp_str[4];
+    void *virtp;
+
+    banner();
+
+    if ((err = dt_config()) == -EINVAL) {
+        __E("bad DT config\n");
+	return err;
+    }
+    else {
+	if (err == -ENODEV) {
+	    __D("no DT config\n");
+	}
+    }
+
+    if ((err = cl_config()) != 0) {
+	__E("error %d processing command line\n", err);
+	return err;
+    }
+
+    mutex_init(&cmem_mutex);
+
+    cmem_major = register_chrdev(0, "cmem", &cmem_fxns);
+
+    if (cmem_major < 0) {
+        __E("Failed to allocate major number.\n");
+        return -ENODEV;
+    }
+
+    __D("Allocated major number: %d\n", cmem_major);
+
+    cmem_class = class_create(THIS_MODULE, "cmem");
+    if (IS_ERR(cmem_class)) {
+        __E("Error creating cmem device class.\n");
+	err = -EIO;
+	goto fail_after_reg;
+    }
+
+    device_create(cmem_class, NULL, MKDEV(cmem_major, 0), NULL, "cmem");
+
+    for (bi = 0; bi < NBLOCKS; bi++) {
+	if (!block_start[bi] || !block_end[bi]) {
+            if (bi != 0) {
+                continue;
+            }
+
+	    /* we know block 0 wasn't specified, ensure no pools for it */
+	    if (pool_num_buffers[0][0]) {
 		__E("pools specified: must specify both phys_start and phys_end, exiting...\n");
 		err = -EINVAL;
 		goto fail_after_create;
 	    }
 	    else {
-		printk(KERN_INFO "no physical memory specified, continuing "
-		       "with no memory allocation capability...\n");
+		printk(KERN_INFO "no physical memory specified\n");
 
 		break;
 	    }
 	}
 
-	if (bi == 1 && (!phys_start_1 || !phys_end_1)) {
-	    continue;
-	}
-
-	if (bi == 2 && (!phys_start_2 || !phys_end_2)) {
-	    continue;
-	}
-
-/* cut-and-paste below as part of adding support for more than 4 blocks */
-	if (bi == 3 && (!phys_start_3 || !phys_end_3)) {
-	    continue;
-	}
-/* cut-and-paste above as part of adding support for more than 4 blocks */
-
-	/* Get the start and end of CMEM memory */
-	block_start[bi] = PAGE_ALIGN(simple_strtoll(pstart[bi], NULL, 16));
-	block_end[bi] = PAGE_ALIGN(simple_strtoll(pend[bi], NULL, 16));
 	length = block_end[bi] - block_start[bi];
 
 	if (block_start[bi] == 0) {
@@ -2229,34 +2396,6 @@ int __init cmem_init(void)
 
 	block_avail_size[bi] = length;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
-	num_physpages = get_num_physpages();
-#endif
-
-	/* attempt to determine the end of Linux kernel memory */
-	phys_end_kernel = virt_to_phys((void *)PAGE_OFFSET) +
-		   (num_physpages << PAGE_SHIFT);
-
-	if (phys_end_kernel > block_start[bi]) {
-	    if (allowOverlap == 0) {
-		__E("CMEM phys_start (%#llx) overlaps kernel (%#llx -> %#llx)\n",
-		    block_start[bi],
-                    (unsigned long long)virt_to_phys((void *)PAGE_OFFSET),
-                    (unsigned long long)phys_end_kernel);
-		err = -EINVAL;
-		goto fail_after_create;
-	    }
-	    else {
-		printk("CMEM Range Overlaps Kernel Physical - allowing overlap\n");
-		printk("CMEM phys_start (%#llx) overlaps kernel (%#llx -> %#llx)\n",
-                       block_start[bi],
-                       (unsigned long long)virt_to_phys((void *)PAGE_OFFSET),
-                       (unsigned long long)phys_end_kernel);
-	    }
-	}
-
-	/* Initialize the top memory chunk in which to put the pools */
-
 	__D("calling request_mem_region(%#llx, %#llx, \"CMEM\")\n",
 	    block_start[bi], length);
 
@@ -2270,30 +2409,16 @@ int __init cmem_init(void)
 	    block_flags[bi] |= BLOCK_MEMREGION;
 	}
 
-	/* Parse and allocate the pools */
+	/* Allocate the pools */
 	for (i = 0; i < npools[bi]; i++) {
-	    t = strsep(&pool_table[bi][i], "x");
-	    if (!t) {
-		err = -EINVAL;
-		goto fail_after_create;
-	    }
-	    pool_num_buffers = simple_strtol(t, NULL, 10);
-
-	    t = strsep(&pool_table[bi][i], "\0");
-	    if (!t) {
-		err = -EINVAL;
-		goto fail_after_create;
-	    }
-	    pool_size = simple_strtoll(t, NULL, 10);
-
-	    if (alloc_pool(bi, i, pool_num_buffers, pool_size, NULL) < 0) {
-		__E("Failed to alloc pool of size %llu and number of buffers %d\n",
-		    pool_size, pool_num_buffers);
+	    if (alloc_pool(bi, i, pool_num_buffers[bi][i], pool_size[bi][i],
+                NULL) < 0) {
+		__E("Failed to alloc pool of size 0x%llu and number of buffers %d\n", pool_size[bi][i], pool_num_buffers[bi][i]);
 		err = -ENOMEM;
 		goto fail_after_create;
 	    }
 
-	    total_num_buffers[bi] += pool_num_buffers;
+	    total_num_buffers[bi] += pool_num_buffers[bi][i];
 	}
 
 	/* use whatever is left for the heap */
