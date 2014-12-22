@@ -62,8 +62,6 @@
 #define HEAP_ALIGN PAGE_SIZE
 
 
-#define __DEBUG
-
 #ifdef __DEBUG
 //#define __D(fmt, args...) printk(KERN_DEBUG "CMEMK Debug: " fmt, ## args)
 #define __D(fmt, args...) printk("CMEMK Debug: " fmt, ## args)
@@ -1400,7 +1398,7 @@ alloc:
 
 		physp = get_phys((void *)virtArg);
 
-		if (physp == ~(0L)) {
+		if (physp == ~(0LL)) {
 		    __E("FREE%s: Failed to convert virtual %#lx to physical\n",
 			cmd & CMEM_HEAP ? "HEAP" : "", virtArg);
 		    return -EFAULT;
@@ -1554,7 +1552,7 @@ alloc:
 
             physp = get_phys((void *)virtArg);
 
-            if (physp == ~(0L)) {
+            if (physp == ~(0LL)) {
                 __E("GETPHYS: Failed to convert virtual %#lx to physical.\n",
                     virtArg);
                 return -EFAULT;
@@ -1710,7 +1708,7 @@ alloc:
 
 #ifdef CHECK_FOR_ALLOCATED_BUFFER
             physp = get_phys(virtp);
-            if (physp == ~(0L)) {
+            if (physp == ~(0LL)) {
                 __E("CACHE%s%s: Failed to convert virtual 0x%p to physical\n",
 		    cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "",
 		    virtp);
