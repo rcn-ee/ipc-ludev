@@ -36,7 +36,18 @@
  * kernel module (cmemk.ko), which needs to be loaded in order for calls to
  * this library to succeed.
  *
- * The following is an example of installing the cmem kernel module:
+ * The CMEM kernel module accepts blocks of phsyical memory and a pool
+ * geometry within those blocks.  The blocks and pools can be specified
+ * either in the traditional command line method, or with the new DT
+ * (Device Tree) method.  The DT method is the prefered method due to
+ * its control by a system integrator.
+ *
+ * Command line block and pool specification
+ * -----------------------------------------
+ *
+ * The following is an example of installing the cmem kernel module using
+ * the traditional command line block and pool parameters (a DT example is
+ * shown below):
  *
  * @verbatim /sbin/insmod cmemk.ko pools=4x30000,2x500000 phys_start=0x0 phys_end=0x3000000 @endverbatim
  *     - phys_start and phys_end must be specified in hexadecimal format
@@ -55,10 +66,11 @@
  * of size 500000 bytes. The CMEM pool buffers start at 0x0 and end at
  * 0x2FFFFFF (max).
  *
- * There is also support for a 2nd contiguous memory block to be specified,
- * with all the same features supported for the 2nd block as with the 1st.
- * This 2nd block is specified with *_1 parameters.  The following example
- * expands upon the first example above:
+ * There is also support for a 2nd, 3rd, or 4th contiguous memory block to
+ * be specified, with all the same features supported for those blocks as
+ * with the 1st.  This 2nd block is specified with *_1 parameters (and 3rd
+ * block with *_2, 4th block with *_3).  The following example expands upon
+ * the first example above:
  *
  * @verbatim /sbin/insmod cmemk.ko pools=4x30000,2x500000 phys_start=0x0 phys_end=0x3000000
     pools_1=4x65536 phys_start_1=0x80000000 phys_end_1=0x80010000 @endverbatim
@@ -68,30 +80,16 @@
  * starts at 0x80000000 and ends at 0x8000FFFF (specified as "end + 1" on the
  * insmod command).
  *
- * In order to access this 2nd memory block, new APIs have been added to
+ * In order to access blocks beyond the 1st block, new APIs have been added to
  * CMEM which allow specification of the block ID.
  *
- * There are two more configuration "switches" for the cmemk.ko kernel module,
+ * There is another configuration "switch" for the cmemk.ko kernel module,
  * which can be specified on the 'insmod' (or 'modprobe') command lines:
  *     useHeapIfPoolUnavailable=[0|1]
- *     allowOverlap=[0|1]
  *
  * 'useHeapIfPoolUnavailable', when set to 1, will cause pool-based allocations
  * to fallback to a heap-based allocation if no pool buffer of sufficient size
  * is available (the CMEM heap is described below).
- *
- * 'allowOverlap', when set to 1, causes cmemk.ko to not fail when it detects
- * that a CMEM memory block location conflicts with the Linux kernel memory,
- * and instead an informational message is printed on the console.  When set to
- * 0, cmemk.ko insertion will fail when this condition is detected.  The
- * overlap detection is fairly crude, however, checking only that the end of
- * the kernel's memory (assigned by way of the u-boot 'bootargs' parameter
- * "mem=") is not above the beginning location of a CMEM memory block.  For
- * example, on most TI processor-based systems the kernel's memory starts at
- * 0x80000000 and ends at (0x80000000+), so a CMEM block starting at
- * 0x1000 would be detected as overlapping since the beginning location of that
- * block is not greater than the end location of the kernel's memory.  To
- * allow this situation, cmemk.ko should be inserted using "allowOverlap=1".
  *
  * Pool buffers are aligned on a module-dependent boundary, and their sizes are
  * rounded up to this same boundary.  This applies to each buffer within a
@@ -135,6 +133,95 @@
  * explictily, or by auto-cleanup) does a buffer actually get freed back to
  * the kernel module.
  *
+ * Block and pool specification using Device Tree (DT)
+ * ---------------------------------------------------
+ *
+ * The Device Tree can be used to specify physical memory blocks and pool
+ * geometry within those blocks, with the same capabilities as the command
+ * line specification.  DT specification is preferred over command line
+ * specification for a number of reasons:
+ *   - allows specifying the physical "carveout" with direct linkage to
+ *     that carveout in the pool specification, thereby eliminating potential
+ *     errors that could occur when the physical carveout is defined in one
+ *     place and then needing to be specified on the cmemk.ko command line
+ *     exactly equivalent to the carveout definition.
+ *   - allows a system integrator to define the CMEM specifications without
+ *     the need to document instructions for the command line, or prepackage
+ *     the command line in some filesystem-based script.
+ *
+ * CMEM allows both DT-specified and command line specified blocks.  Each
+ * block is assigned a number that can be later used for allocations in
+ * order to direct the allocation to a particular block.  This allows some
+ * blocks to be defined in the DT and other blocks to be later defined
+ * on the CMEM command line.  If a particular block number is assigned in
+ * DT and also specified on the CMEM command line then the DT specification
+ * takes precedence and the command line specification is ignored.
+ *
+ * The following DT example snippet illustrates the syntax...
+ *
+ * // Specify reserved physical blocks, using "no-map" to keep Linux away.
+ * // The "reg" property is the base address and size in 32-bit ints.
+ * // This is the generic "reserved-memory" node that might also contain
+ * // other non-CMEM entries.
+ *
+ *      reserved-memory {
+ *              #address-cells = <1>;
+ *              #size-cells = <1>;
+ *              ranges;
+ *      ...
+ *              cmem_block_mem_0: cmem_block_mem@a0000000 {
+ *                      reg = <0xa0000000 0x10000000>;
+ *                      no-map;
+ *                      status = "okay";
+ *              };
+ *
+ *              cmem_block_mem_1: cmem_block_mem@b0000000 {
+ *                      reg = <0xb0000000 0x02000000>;
+ *                      no-map;
+ *                      status = "okay";
+ *              };
+ *      };
+ *
+ * // The CMEM node is specified below, and can be named arbitrarily ("cmem"
+ * // name chosen here).  The node's "compatible" property must contain
+ * // "ti,cmem" in order for CMEM to process it.
+ *
+ *      cmem {
+ *              compatible = "ti,cmem";  // must be "ti,cmem"
+ *              #address-cells = <1>;
+ *              #size-cells = <0>;
+ *
+ *              status = "okay";
+ *
+ * // CMEM block specifications along with pool geometry.
+ * //
+ * // The "reg" property is the block identifier, and each child of the
+ * // cmem node must specify a different "reg" value.  The domain of
+ * // the block identifier is 0 -> <nblocks - 1>, where nblocks is the
+ * // total amount of DT-specified and command line-specified blocks.
+ * // CMEM currently supports up to 4 blocks (although that can be increased
+ * // by simple comment-directed modifications in cmemk.c).
+ * //
+ * // The "memory-region" property points to the phandle of the
+ * // reserved-memory area.
+ * //
+ * // The "cmem-buf-pools" property contains a variable number of comma-
+ * // separated pools, with each pool specifying the number of buffers and
+ * // the size of each buffer in <n size> format.
+ *
+ *              cmem_block_0: cmem_block@0 {
+ *                      reg = <0>;
+ *                      memory-region = <&cmem_block_mem_0>;
+ *                      cmem-buf-pools = <1 0x0c000000>, <4 0x01000000>; // 1x256MB, 4x16MB pools
+ *              };
+ *
+ *              cmem_block_1: cmem_block@1 {
+ *                      reg = <1>;
+ *                      memory-region = <&cmem_block_mem_1>;
+ *                      cmem-buf-pools = <1 0x02000000>; // 1x32MB pool, remaining carveout is heap.
+ *              };
+ *      };
+ *
  * Decoupled allocation & memory mapping
  * -------------------------------------
  *
@@ -145,7 +232,7 @@
  * "Phys" APIs.  The user-space memory mapping is performed with the
  * CMEM_map()/CMEM_unmap() APIs.  This allows large buffer allocations
  * without the burden of using up a large portion of the application's
- * virtual address space for the length of the allocation's existence.
+ * virtual address space for the duration of the allocation's existence.
  * A mapping performed by CMEM_map() doesn't have to be for the whole of
  * the allocated buffer, it can be for just portions of the buffer (but
  * must not be larger than the allocated buffer).

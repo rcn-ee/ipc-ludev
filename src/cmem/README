@@ -5,18 +5,30 @@
 This package contains a Linux kernel loadable module as well as the user
 interface library.  It also contains a small set of tests.
 
-This particular implementation of CMEM's loadable kernel module is based
-on the Linux kernel's CMA support.  It requires a small in-kernel stub that
-must be added to your Linux kernel source tree.
-
 In order to build the source code you will need to edit products.mak, pointing
 it to your KERNEL_INSTALL_DIR and your codegen directories.
+
+Linux CMA (Contiguous Memory Allocator) support
+===============================================
+
+This implementation of CMEM's loadable kernel module supports the use of
+the Linux kernel's CMA framework, as well as the traditional "carveout"
+usage (a "carveout" is physical memory that is kept out of Linux's control).
+The CMA usage can include CMEM-specific CMA blocks, in addtion to the usage
+of the CMA global area that is always present when CMA is configured in the
+kernel configuration.  The CMEM-specific CMA block usage requires a small
+in-kernel stub that must be added to your Linux kernel source tree.
 
 Linux kernel stub
 =================
 
-There are a few files that must be placed in your kernel's source tree.
-These files can be found in 'cmem/module/kernel'.
+The CMEM Linux kernel stub allows usage of CMEM-owned CMA areas.  Without
+the stub, one can still achieve CMA allocations through CMEM, although
+such allocations would come from the global CMA area (which can also be
+consumed by other kernel device drivers).
+
+To use the kernel stub there are a few files that must be placed in your
+kernel's source tree.  These files can be found in 'cmem/module/kernel'.
 
 The file cmemk_stub.c must be added to your Linux kernel source tree.  While
 it can reside anywhere, it is recommended to create a new 'drivers/cmem'
@@ -101,12 +113,11 @@ Installing the loadable kernel module
 The loadable kernel module 'cmemk.ko' can be installed into a running
 system with the command:
         % insmod cmemk.ko
-The traditional non-CMA CMEM implementation supports a number of module
-parameters to define block start/end and pool geometry.  With this CMA
-CMEM implementation, these parameters have been superceded by the kernel
-command-line parameters specified above (although block start/end is not
-yet supported).  However, one can still specifiy 'useHeapIfPoolUnavailable=1'
-when insmod'ing cmemk.ko.
+The traditional non-CMA CMEM usage supports a number of module parameters
+to define block start/end and pool geometry (documented elsewhere).  These
+parameters can be used in addition to the CMA parameters, or by themselves
+without any CMA parameters (although the global CMA capability is always
+there when CMA is enabled in the Linux kernel).
 
 API test
 ========
