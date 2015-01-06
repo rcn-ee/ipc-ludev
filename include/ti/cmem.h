@@ -36,7 +36,7 @@
  * kernel module (cmemk.ko), which needs to be loaded in order for calls to
  * this library to succeed.
  *
- * The CMEM kernel module accepts blocks of phsyical memory and a pool
+ * The CMEM kernel module accepts blocks of physical memory and a pool
  * geometry within those blocks.  The blocks and pools can be specified
  * either in the traditional command line method, or with the new DT
  * (Device Tree) method.  The DT method is the prefered method due to
@@ -159,6 +159,7 @@
  *
  * The following DT example snippet illustrates the syntax...
  *
+ * @code 
  * // Specify reserved physical blocks, using "no-map" to keep Linux away.
  * // The "reg" property is the base address and size in 32-bit ints.
  * // This is the generic "reserved-memory" node that might also contain
@@ -221,6 +222,7 @@
  *                      cmem-buf-pools = <1 0x02000000>; // 1x32MB pool, remaining carveout is heap.
  *              };
  *      };
+ * @endcode
  *
  * Decoupled allocation & memory mapping
  * -------------------------------------
