@@ -1474,9 +1474,8 @@ alloc:
 			     */
 			    virtp_end = virtp + size;
 #if 1
+			    outer_inv_range(physp, physp + size);
 			    dmac_map_area(virtp, size, DMA_FROM_DEVICE);
-			    outer_inv_range(__pa((u32)virtp),
-					    __pa((u32)virtp_end));
 #else
 			    dma_sync_single_for_device(NULL, (dma_addr_t)physp, size, DMA_FROM_DEVICE);
 #endif
@@ -1750,8 +1749,7 @@ alloc:
 	      case CMEM_IOCCACHEWB:
 #if 1
 		dmac_map_area(virtp, block.size, DMA_TO_DEVICE);
-		outer_clean_range(__pa((u32)virtp),
-		                  __pa((u32)virtp + block.size));
+		outer_clean_range(physp, physp + block.size);
 #else
 		dma_sync_single_for_device(NULL, (dma_addr_t)physp, block.size, DMA_TO_DEVICE);
 #endif
@@ -1762,9 +1760,8 @@ alloc:
 
 	      case CMEM_IOCCACHEINV:
 #if 1
+		outer_inv_range(physp, physp + block.size);
 		dmac_map_area(virtp, block.size, DMA_FROM_DEVICE);
-		outer_inv_range(__pa((u32)virtp),
-		                __pa((u32)virtp + block.size));
 #else
 		dma_sync_single_for_device(NULL, (dma_addr_t)physp, block.size, DMA_FROM_DEVICE);
 #endif
@@ -1776,8 +1773,7 @@ alloc:
 	      case CMEM_IOCCACHEWBINV:
 #if 1
 		dmac_map_area(virtp, block.size, DMA_BIDIRECTIONAL);
-		outer_flush_range(__pa((u32)virtp),
-		                  __pa((u32)virtp + block.size));
+		outer_flush_range(physp, physp + block.size);
 #else
 		dma_sync_single_for_device(NULL, (dma_addr_t)physp, block.size, DMA_TO_DEVICE);
 		dma_sync_single_for_device(NULL, (dma_addr_t)physp, block.size, DMA_FROM_DEVICE);
