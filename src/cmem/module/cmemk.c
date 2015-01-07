@@ -2091,6 +2091,8 @@ static void banner(void)
           );
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
+
 /*
  * dt_config needs to set:
  *   block_start[bi]
@@ -2213,6 +2215,8 @@ int dt_config(void)
     return 0;
 }
 
+#endif /* KERNEL_VERSION >= 3.14.0 */
+
 /*
  * cl_config needs to set:
  *   block_start[bi]
@@ -2320,6 +2324,7 @@ int __init cmem_init(void)
 
     banner();
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
     if ((err = dt_config()) == -EINVAL) {
         __E("bad DT config\n");
 	return err;
@@ -2329,6 +2334,7 @@ int __init cmem_init(void)
 	    __D("no DT config\n");
 	}
     }
+#endif /* KERNEL_VERSION >= 3.14.0 */
 
     if ((err = cl_config()) != 0) {
 	__E("error %d processing command line\n", err);
