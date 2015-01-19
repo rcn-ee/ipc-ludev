@@ -1239,7 +1239,12 @@ alloc:
 	    if (bi == NBLOCKS) {
 		virtp = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
 
+#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
+		/* adjust from 32-bit alias to 36-bit phys */
+		physp = dma + 0x780000000ULL;
+#else
 		physp = dma;
+#endif
 		entry->dev = dev;
 		entry->kvirtp = virtp;
 	    }
