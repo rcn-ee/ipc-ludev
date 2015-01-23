@@ -63,8 +63,7 @@
 
 
 #ifdef __DEBUG
-//#define __D(fmt, args...) printk(KERN_DEBUG "CMEMK Debug: " fmt, ## args)
-#define __D(fmt, args...) printk("CMEMK Debug: " fmt, ## args)
+#define __D(fmt, args...) printk(KERN_DEBUG "CMEMK Debug: " fmt, ## args)
 #else
 #define __D(fmt, args...)
 #endif
@@ -379,15 +378,6 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
     size_t curSize, adjSize;
     size_t remainSize;  /* free memory after allocated memory */
     size_t adjAlign, offset;
-//    long key;
-
-#if 0
-    /* Assert that requested align is a power of 2 */
-    Assert_isTrue(((reqAlign & (reqAlign - 1)) == 0), HeapMem_A_align);
-
-    /* Assert that requested block size is non-zero */
-    Assert_isTrue((reqSize != 0), HeapMem_A_zeroBlock);
-#endif
 
     adjSize = reqSize;
 
@@ -406,12 +396,6 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
         /* adjAlign is less than HEAP_ALIGN */
         adjAlign = HEAP_ALIGN;
     }
-
-/*
- * We don't need to enter the "gate" since this function is called
- * with it held already.
- */
-//    key = Gate_enterModule();
 
     /*
      * The block will be allocated from curHeader. Maintain a pointer to
@@ -433,11 +417,6 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
             offset = adjAlign - offset;
         }
 
-#if 0
-        /* Internal Assert that offset is a multiple of HEAP_ALIGN */
-        Assert_isTrue(((offset & (HEAP_ALIGN - 1)) == 0), NULL);
-#endif
-
         /* big enough? */
         if (curSize >= (adjSize + offset)) {
             /* Set the pointer that will be returned. Alloc from front */
@@ -452,11 +431,6 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
              *  Note: this cannot be negative because of above comparison.
              */
             remainSize = curSize - adjSize - offset;
-
-#if 0
-            /* Internal Assert that remainSize is a multiple of HEAP_ALIGN */
-            Assert_isTrue(((remainSize & (HEAP_ALIGN - 1)) == 0), NULL);
-#endif
 
 	    if (remainSize) {
 		newHeaderPhys = allocAddr + adjSize;
@@ -518,12 +492,6 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
 		}
             }
 
-/*
- * See above comment on Gate_enterModule for an explanation of why we
- * don't use the "gate".
- */
-//            Gate_leaveModule(key);
-
 	    unmap_header(curHeader, curHeader_vm_area);
 
             /* Success, return the allocated memory */
@@ -537,12 +505,6 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
         }
     }
 
-/*
- * See above comment on Gate_enterModule for an explanation of why we
- * don't use the "gate".
- */
-//    Gate_leaveModule(key);
-
     return 0;
 }
 
@@ -551,7 +513,6 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
  */
 void HeapMem_free(int bi, phys_addr_t block, size_t size)
 {
-//    long key;
     struct vm_struct *curHeader_vm_area;
     struct vm_struct *newHeader_vm_area;
     struct vm_struct *nextHeader_vm_area;
@@ -567,12 +528,6 @@ void HeapMem_free(int bi, phys_addr_t block, size_t size)
     if ((offset = size & (HEAP_ALIGN - 1)) != 0) {
         size += HEAP_ALIGN - offset;
     }
-
-/*
- * We don't need to enter the "gate" since this function is called
- * with it held already.
- */
-//    key = Gate_enterModule();
 
     newHeaderPhys = block;
     nextHeaderPhys = heap_head[bi].next;
@@ -625,12 +580,6 @@ void HeapMem_free(int bi, phys_addr_t block, size_t size)
     }
 
     unmap_header(newHeader, newHeader_vm_area);
-
-/*
- * See above comment on Gate_enterModule for an explanation of why we
- * don't use the "gate".
- */
-//    Gate_leaveModule(key);
 }
 
 /* Traverses the page tables and translates a virtual address to a physical. */
@@ -1478,12 +1427,9 @@ alloc:
 			     * HeapMem_free()
 			     */
 			    virtp_end = virtp + size;
-#if 1
 			    outer_inv_range(physp, physp + size);
 			    dmac_map_area(virtp, size, DMA_FROM_DEVICE);
-#else
-			    dma_sync_single_for_device(NULL, (dma_addr_t)physp, size, DMA_FROM_DEVICE);
-#endif
+
 			    __D("FREEHEAP: invalidated user virtual "
 			        "0x%p -> 0x%p\n", virtp, virtp_end);
 			}
@@ -1752,37 +1698,27 @@ alloc:
 
 	    switch (cmd & ~CMEM_IOCMAGIC) {
 	      case CMEM_IOCCACHEWB:
-#if 1
 		dmac_map_area(virtp, block.size, DMA_TO_DEVICE);
 		outer_clean_range(physp, physp + block.size);
-#else
-		dma_sync_single_for_device(NULL, (dma_addr_t)physp, block.size, DMA_TO_DEVICE);
-#endif
+
 		__D("CACHEWB: cleaned user virtual 0x%p -> 0x%p\n",
 		       virtp, virtp_end);
 
 		break;
 
 	      case CMEM_IOCCACHEINV:
-#if 1
 		outer_inv_range(physp, physp + block.size);
 		dmac_map_area(virtp, block.size, DMA_FROM_DEVICE);
-#else
-		dma_sync_single_for_device(NULL, (dma_addr_t)physp, block.size, DMA_FROM_DEVICE);
-#endif
+
 		__D("CACHEINV: invalidated user virtual 0x%p -> 0x%p\n",
 		       virtp, virtp_end);
 
 		break;
 
 	      case CMEM_IOCCACHEWBINV:
-#if 1
 		dmac_map_area(virtp, block.size, DMA_BIDIRECTIONAL);
 		outer_flush_range(physp, physp + block.size);
-#else
-		dma_sync_single_for_device(NULL, (dma_addr_t)physp, block.size, DMA_TO_DEVICE);
-		dma_sync_single_for_device(NULL, (dma_addr_t)physp, block.size, DMA_FROM_DEVICE);
-#endif
+
 		__D("CACHEWBINV: flushed user virtual 0x%p -> 0x%p\n",
 		       virtp, virtp_end);
 
@@ -2022,20 +1958,6 @@ static int release(struct inode *inode, struct file *filp)
 
 			list_del(u);
 			kfree(user);
-
-#if 0
-			/*
-			 * If a process is limited to appearing on an entry's
-			 * registered user list only one time, then the
-			 * test below could be done as an optimization, since
-			 * if we're here and it's not last close, we just
-			 * removed the "current" process from the list (see
-			 * IOCREGUSER ioctl() command comment).
-			 */
-			if (!last_close) {
-			    break;
-			}
-#endif
 		    }
 
 		    u = unext;
