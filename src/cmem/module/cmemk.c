@@ -1868,7 +1868,7 @@ static int mmap(struct file *filp, struct vm_area_struct *vma)
 
 	if (entry->flags & CMEM_CACHED) {
 	    vma->vm_page_prot = __pgprot(pgprot_val(vma->vm_page_prot) |
-                               (L_PTE_MT_WRITETHROUGH | L_PTE_MT_BUFFERABLE));
+                               (L_PTE_MT_WRITEALLOC | L_PTE_MT_BUFFERABLE));
 	}
 	else {
 	    vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
