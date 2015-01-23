@@ -174,6 +174,13 @@ module_param_array(pools_3, charp, &npools[3], S_IRUGO);
 /* end block 3 */
 /* cut-and-paste above as part of adding support for more than 4 blocks */
 
+static int allowOverlap = -1;
+MODULE_PARM_DESC(allowOverlap,
+    "\n\t\t DEPRECATED - ignored if found"
+    "\n\t\t Set to 1 if cmem range is allowed to overlap memory range"
+    "\n\t\t allocated to kernel physical mem (via mem=xxx)");
+module_param(allowOverlap, int, S_IRUGO);
+
 static int useHeapIfPoolUnavailable = 0;
 MODULE_PARM_DESC(useHeapIfPoolUnavailable,
     "\n\t\t Set to 1 if you want a pool-based allocation request to"
@@ -2158,6 +2165,11 @@ int cl_config(void)
     int bi;
     int i;
     char *t;
+
+    /* if allowOverlap != -1 then it was set on the command line (to 0 or 1) */
+    if (allowOverlap != -1) {
+	pr_warn("cmem_init: allowOverlap parameter has been deprecated, ignoring...\n");
+    }
 
     if (npools[0] > MAX_POOLS) {
 	__E("Too many pools specified (%d) for Block 0, only %d supported.\n", npools[0], MAX_POOLS);
