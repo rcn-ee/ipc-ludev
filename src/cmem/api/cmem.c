@@ -70,6 +70,7 @@ static int ref_count = 0;
 static void *getAndAllocFromPool(int blockid, unsigned long long size, CMEM_AllocParams *params, off_t *physp);
 static void *allocFromHeap(int blockid, size_t size, CMEM_AllocParams *params, off_t *physp);
 static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params, off_t *physp);
+static void *allocPool(int blockid, int poolid, CMEM_AllocParams *params, off_t *physp);
 
 static int validate_init()
 {
@@ -156,7 +157,11 @@ int CMEM_init(void)
 static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params, off_t *physp)
 {
     union CMEM_AllocUnion allocDesc;
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+    off64_t phys;
+#else
     off_t phys;
+#endif
     void *userp;
     unsigned long long size;
     size_t map_size;
@@ -177,7 +182,11 @@ static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params, of
 
         return NULL;
     }
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+    phys = (off64_t)allocDesc.alloc_pool_outparams.physp;
+#else
     phys = (off_t)allocDesc.alloc_pool_outparams.physp;
+#endif
     size = allocDesc.alloc_pool_outparams.size;
 
     __D("allocPool: allocated phys buffer %#llx, size %#llx\n",
@@ -185,7 +194,11 @@ static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params, of
 
     /* non-NULL physp means "don't map", return NULL since no virt ptr */
     if (physp) {
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+	*physp = (off_t)phys;
+#else
 	*physp = phys;
+#endif
 	return NULL;
     }
 
@@ -199,6 +212,24 @@ static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params, of
     }
 
     /* Map the physical address to user space */
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+    userp = mmap64(0,                       // Preferred start address
+                   map_size,                // Length to be mapped
+                   PROT_WRITE | PROT_READ,  // Read and write access
+                   MAP_SHARED,              // Shared memory
+                   cmem_fd,                 // File descriptor
+                   phys);                   // The byte offset from fd
+
+    if (userp == MAP_FAILED) {
+        __E("allocPool: Failed to mmap64 buffer at physical address %#llx\n",
+            (unsigned long long)phys);
+        __E("    Freeing phys buffer %#llx\n", (unsigned long long)phys);
+        ioctl(cmem_fd, CMEM_IOCFREEPHYS | CMEM_IOCMAGIC , &phys);
+        return NULL;
+    }
+
+    __D("allocPool: mmap64 succeeded, returning virt buffer %p\n", userp);
+#else
     userp = mmap(0,                       // Preferred start address
                  map_size,                // Length to be mapped
                  PROT_WRITE | PROT_READ,  // Read and write access
@@ -215,6 +246,7 @@ static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params, of
     }
 
     __D("allocPool: mmap succeeded, returning virt buffer %p\n", userp);
+#endif
 
     return userp;
 }
@@ -244,7 +276,11 @@ static void *allocFromHeap(int blockid, size_t size, CMEM_AllocParams *params, o
 {
     void *userp;
     union CMEM_AllocUnion allocDesc;
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+    off64_t phys;
+#else
     off_t phys;
+#endif
     unsigned int cmd;
     int rv;
 
@@ -266,23 +302,49 @@ static void *allocFromHeap(int blockid, size_t size, CMEM_AllocParams *params, o
 
         return NULL;
     }
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+    phys = (off64_t)allocDesc.physp;
+#else
     phys = (off_t)allocDesc.physp;
+#endif
 
     __D("allocHeap: allocated phys buffer %#llx\n", (unsigned long long)phys);
 
     /* non-NULL physp means "don't map", return NULL since no virt ptr */
     if (physp) {
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+	*physp = (off_t)phys;
+#else
 	*physp = phys;
+#endif
 	return NULL;
     }
 
     /* Map the physical address to user space */
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+    userp = mmap64(0,                       // Preferred start address
+                   size,                    // Length to be mapped
+                   PROT_WRITE | PROT_READ,  // Read and write access
+                   MAP_SHARED,              // Shared memory
+                   cmem_fd,                 // File descriptor
+                   phys);                   // The byte offset from fd
+
+    if (userp == MAP_FAILED) {
+        __E("allocHeap: Failed to mmap64 buffer at physical address %#llx\n",
+            (unsigned long long)phys);
+        __E("    Freeing phys buffer %#llx\n", (unsigned long long)phys);
+        ioctl(cmem_fd, CMEM_IOCFREEHEAPPHYS | CMEM_IOCMAGIC, &phys);
+        return NULL;
+    }
+
+    __D("allocHeap: mmap64 succeeded, returning virt buffer %p\n", userp);
+#else
     userp = mmap(0,                       // Preferred start address
                  size,                    // Length to be mapped
                  PROT_WRITE | PROT_READ,  // Read and write access
                  MAP_SHARED,              // Shared memory
                  cmem_fd,                 // File descriptor
-                 phys);                  // The byte offset from fd
+                 phys);                   // The byte offset from fd
 
     if (userp == MAP_FAILED) {
         __E("allocHeap: Failed to mmap buffer at physical address %#llx\n",
@@ -293,6 +355,7 @@ static void *allocFromHeap(int blockid, size_t size, CMEM_AllocParams *params, o
     }
 
     __D("allocHeap: mmap succeeded, returning virt buffer %p\n", userp);
+#endif
 
     return userp;
 }
@@ -361,6 +424,158 @@ off_t CMEM_allocPhys2(int blockid, size_t size, CMEM_AllocParams *params)
     return physp;
 }
 
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+
+off64_t CMEM_allocPhys64(int blockid, size_t size, CMEM_AllocParams *params)
+{
+    off_t physp;
+    off64_t physp64;
+
+    alloc(blockid, size, params, &physp);
+
+    physp64 = (off64_t)physp;
+
+    /* squash the sign-extension when casting to 64-bits */
+    physp64 &= 0x00000000ffffffffULL;
+
+    return physp64;
+}
+
+off64_t CMEM_allocPoolPhys64(int blockid, int poolid, CMEM_AllocParams *params)
+{
+    off_t physp;
+    off64_t physp64;
+
+    allocPool(blockid, poolid, params, &physp);
+
+    physp64 = (off64_t)physp;
+
+    /* squash the sign-extension when casting to 64-bits */
+    physp64 &= 0x00000000ffffffffULL;
+
+    return physp64;
+}
+
+void *CMEM_registerAlloc64(off64_t physp)
+{
+    union CMEM_AllocUnion allocDesc;
+    void *userp;
+    size_t size;
+    int rv;
+
+    allocDesc.physp = (unsigned long long)physp;
+    rv = ioctl(cmem_fd, CMEM_IOCREGUSER | CMEM_IOCMAGIC, &allocDesc);
+    if (rv != 0) {
+        __E("registerAlloc64: ioctl CMEM_IOCREGUSER failed for phys addr %#llx: %d\n",
+	    (unsigned long long)physp, rv);
+
+        return NULL;
+    }
+    size = allocDesc.size;
+
+    __D("registerAlloc64: registered use of phys buffer %#llx, size %#x\n",
+        (unsigned long long)physp, size);
+
+    /* Map the physical address to user space */
+    userp = mmap64(0,                       // Preferred start address
+                   size,                    // Length to be mapped
+                   PROT_WRITE | PROT_READ,  // Read and write access
+                   MAP_SHARED,              // Shared memory
+                   cmem_fd,                 // File descriptor
+                   physp);                  // The byte offset from fd
+
+    if (userp == MAP_FAILED) {
+        __E("registerAlloc64: Failed to mmap64 buffer at physical address %#llx\n",
+            (unsigned long long)physp);
+        __E("    Unregistering use of phys buffer %#llx\n",
+	    (unsigned long long)physp);
+        ioctl(cmem_fd, CMEM_IOCFREEPHYS | CMEM_IOCMAGIC, &physp);
+
+        return NULL;
+    }
+
+    __D("registerAlloc64: mmap64 succeeded, returning virt buffer %p\n", userp);
+
+    return userp;
+}
+
+void *CMEM_map64(off64_t physp, size_t size)
+{
+    void *userp;
+
+    __D("map64: mapping phys buffer %#llx, size %#x\n",
+        (unsigned long long)physp, size);
+
+    /* Map the physical address to user space */
+    userp = mmap64(0,                       // Preferred start address
+                   size,                    // Length to be mapped
+                   PROT_WRITE | PROT_READ,  // Read and write access
+                   MAP_SHARED,              // Shared memory
+                   cmem_fd,                 // File descriptor
+                   physp);                  // The byte offset from fd
+
+    if (userp == MAP_FAILED) {
+        __E("map64: Failed to mmap64 buffer at physical address %#llx\n",
+            (unsigned long long)physp);
+
+        return NULL;
+    }
+
+    __D("map64: mmap64 succeeded, returning virt buffer 0x%p\n", userp);
+
+    return userp;
+}
+
+off64_t CMEM_getPhys64(void *ptr)
+{
+    union CMEM_AllocUnion getDesc;
+
+    __D("getPhys64: entered w/ addr %p\n", ptr);
+
+    if (!validate_init()) {
+	return 0;
+    }
+
+    getDesc.virtp = ptr;
+    if (ioctl(cmem_fd, CMEM_IOCGETPHYS | CMEM_IOCMAGIC, &getDesc) == -1) {
+        __E("getPhys64: Failed to get physical address of %#x\n",
+            (unsigned int)ptr);
+        return 0;
+    }
+
+    __D("getPhys64: exiting, ioctl CMEM_IOCGETPHYS succeeded, returning %#llx\n",
+        getDesc.physp);
+
+    return (off64_t)getDesc.physp;
+}
+
+int CMEM_freePhys64(off64_t physp, CMEM_AllocParams *params)
+{
+    if (params == NULL) {
+	params = &CMEM_DEFAULTPARAMS;
+    }
+
+    __D("freePhys64: entered w/ physical address %#llx, params - type %s%s\n",
+        (unsigned long long)physp,
+        params->type == CMEM_POOL ? "POOL" : "HEAP",
+        params == &CMEM_DEFAULTPARAMS ? " (default)" : "");
+
+    if (!validate_init()) {
+	return -1;
+    }
+
+    if (ioctl(cmem_fd, CMEM_IOCFREEPHYS | CMEM_IOCMAGIC, &physp) == -1) {
+	__E("freePhys64: Failed to free buffer at physical address %#llx\n",
+	    (unsigned long long)physp);
+
+	return -1;
+    }
+
+    return 0;
+}
+
+#endif
+
 void *CMEM_registerAlloc(off_t physp)
 {
     union CMEM_AllocUnion allocDesc;
@@ -387,7 +602,7 @@ void *CMEM_registerAlloc(off_t physp)
                  PROT_WRITE | PROT_READ,  // Read and write access
                  MAP_SHARED,              // Shared memory
                  cmem_fd,                 // File descriptor
-                 physp);               // The byte offset from fd
+                 physp);                  // The byte offset from fd
 
     if (userp == MAP_FAILED) {
         __E("registerAlloc: Failed to mmap buffer at physical address %#llx\n",
@@ -417,7 +632,7 @@ void *CMEM_map(off_t physp, size_t size)
                  PROT_WRITE | PROT_READ,  // Read and write access
                  MAP_SHARED,              // Shared memory
                  cmem_fd,                 // File descriptor
-                 physp);               // The byte offset from fd
+                 physp);                  // The byte offset from fd
 
     if (userp == MAP_FAILED) {
         __E("map: Failed to mmap buffer at physical address %#llx\n",

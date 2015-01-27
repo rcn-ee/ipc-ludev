@@ -625,6 +625,32 @@ off_t CMEM_allocPoolPhys(int poolid, CMEM_AllocParams *params);
  */
 off_t CMEM_allocPoolPhys2(int blockid, int poolid, CMEM_AllocParams *params);
 
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+/**
+ * @brief Allocate unmapped memory from a specified pool in a specified
+ *        memory block (Android only).
+ *
+ * @param   blockid The memory block from which to allocate.
+ * @param   poolid  The pool from which to allocate memory.
+ * @param   params  Allocation parameters.
+ *
+ * @remarks @c params->type is ignored - a pool will always be used.
+ * @remarks @c params->alignment is unused, since pool buffers are already
+ *          aligned to specific boundaries.
+ *
+ * @return The physical address of the allocated buffer, or NULL for failure.
+ *
+ * @pre Must have called CMEM_init()
+ *
+ * @sa CMEM_allocPhys()
+ * @sa CMEM_allocPhys2()
+ * @sa CMEM_allocPoolPhys()
+ * @sa CMEM_freePhys()
+ * @sa CMEM_map()
+ */
+off64_t CMEM_allocPoolPhys64(int blockid, int poolid, CMEM_AllocParams *params);
+#endif
+
 /**
  * @brief Allocate unmapped memory of a specified size
  *
@@ -680,6 +706,37 @@ off_t CMEM_allocPhys(size_t size, CMEM_AllocParams *params);
  */
 off_t CMEM_allocPhys2(int blockid, size_t size, CMEM_AllocParams *params);
 
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+/**
+ * @brief Allocate unmapped memory of a specified size from a specified
+ *        memory block (Android only)
+ *
+ * @param   blockid The memory block from which to allocate.
+ * @param   size    The size of the buffer to allocate.
+ * @param   params  Allocation parameters.
+ *
+ * @remarks Used to allocate memory from either a pool, the heap, or the CMA
+ *          global area.
+ *          If doing a pool allocation, the pool that best fits the requested
+ *          size will be selected.  Use CMEM_allocPool() to allocate from a
+ *          specific pool.
+ *
+ * @remarks Allocation will be cached or noncached, as specified by params.
+ *          params->alignment valid only for heap allocation.
+ *
+ * @return The physical address of the allocated buffer, or NULL for failure.
+ *
+ * @pre Must have called CMEM_init()
+ *
+ * @sa CMEM_allocPoolPhys()
+ * @sa CMEM_allocPoolPhys2()
+ * @sa CMEM_allocPhys()
+ * @sa CMEM_freePhys()
+ * @sa CMEM_map()
+ */
+off64_t CMEM_allocPhys64(int blockid, size_t size, CMEM_AllocParams *params);
+#endif
+
 /**
  * @brief Register shared usage of an already-allocated buffer
  *
@@ -704,6 +761,34 @@ off_t CMEM_allocPhys2(int blockid, size_t size, CMEM_AllocParams *params);
  * @sa CMEM_unregister()
  */
 void *CMEM_registerAlloc(off_t physp);
+
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+/**
+ * @brief Register shared usage of an already-allocated buffer using mmap64
+ *        (Android only)
+ *
+ * @param   physp  Physical address of the already-allocated buffer.
+ *
+ * @remarks Used to register the calling process for usage of an
+ *          already-allocated buffer, for the purpose of shared usage of
+ *          the buffer.
+ *
+ * @remarks Allocation properties (such as cached/noncached or heap/pool)
+ *          are inherited from original allocation call.
+ *
+ * @return  A process-specific pointer to the allocated buffer, or NULL
+ *          for failure.
+ *
+ * @pre Must have called some form of CMEM_alloc*()
+ *
+ * @sa CMEM_allocPool()
+ * @sa CMEM_allocPool2()
+ * @sa CMEM_alloc()
+ * @sa CMEM_free()
+ * @sa CMEM_unregister()
+ */
+void *CMEM_registerAlloc64(off64_t physp);
+#endif
 
 /**
  * @brief Free a buffer previously allocated with
@@ -752,6 +837,31 @@ int CMEM_free(void *ptr, CMEM_AllocParams *params);
  */
 int CMEM_freePhys(off_t physp, CMEM_AllocParams *params);
 
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+/**
+ * @brief Free an unmapped buffer previously allocated with
+ *        CMEM_allocPhys64()/CMEM_allocPoolPhys64() (Android only).
+ *
+ * @param   physp   The physical address of the buffer.
+ * @param   params  Allocation parameters.
+ *
+ * @remarks Use the same CMEM_AllocParams as was used for the allocation.
+ *          params->flags is "don't care".  params->alignment is "don't
+ *          care".
+ *
+ * @return 0 for success or -1 for failure.
+ *
+ * @pre Must have called CMEM_init()
+ *
+ * @sa CMEM_allocPhys()
+ * @sa CMEM_allocPhys2()
+ * @sa CMEM_allocPoolPhys()
+ * @sa CMEM_allocPoolPhys2()
+ * @sa CMEM_unmap()
+ */
+int CMEM_freePhys64(off64_t physp, CMEM_AllocParams *params);
+#endif
+
 /**
  * @brief Unregister use of a buffer previously registered with
  *        CMEM_registerAlloc().
@@ -786,6 +896,19 @@ int CMEM_unregister(void *ptr, CMEM_AllocParams *params);
  * @pre Must have called CMEM_init()
  */
 off_t CMEM_getPhys(void *ptr);
+
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+/**
+ * @brief Get the physical address of a contiguous buffer (Android only).
+ *
+ * @param   ptr     The pointer to the buffer.
+ *
+ * @return The physical address of the buffer or 0 for failure.
+ *
+ * @pre Must have called CMEM_init()
+ */
+off64_t CMEM_getPhys64(void *ptr);
+#endif
 
 /**
  * @brief Do a cache writeback/invalidate of the whole cache
@@ -831,6 +954,24 @@ int CMEM_cacheWb(void *ptr, size_t size);
  * @sa CMEM_unmap()
  */
 void *CMEM_map(off_t physp, size_t size);
+
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+/**
+ * @brief Map allocated memory using mmap64 (Android only)
+ *
+ * @param   physp   Physical address of the already-allocated buffer.
+ * @param   size    Size in bytes of block to map.
+ *
+ * @return A pointer to the mapped buffer, or NULL for failure.
+ *
+ * @pre Must have called CMEM_init()
+ *
+ * @sa CMEM_allocPhys()
+ * @sa CMEM_allocPoolPhys()
+ * @sa CMEM_unmap()
+ */
+void *CMEM_map64(off64_t physp, size_t size);
+#endif
 
 /**
  * @brief Unmap allocated memory
