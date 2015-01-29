@@ -536,7 +536,11 @@ int testMap(size_t size)
 {
     int *ptr;
     int *map_ptr;
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+    off64_t physp;
+#else
     off_t physp;
+#endif
     int ret = 0;
 
     ptr = CMEM_alloc(size, NULL);
@@ -550,8 +554,13 @@ int testMap(size_t size)
     printf("    writing 0xdadaface to *ptr\n");
     *ptr = 0xdadaface;
 
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+    physp = CMEM_getPhys64(ptr);
+    map_ptr = CMEM_map64(physp, size);
+#else
     physp = CMEM_getPhys(ptr);
     map_ptr = CMEM_map(physp, size);
+#endif
     if (map_ptr == NULL) {
 	printf("testMap: CMEM_map() failed\n");
 	ret = 1;
@@ -580,7 +589,11 @@ int testMap(size_t size)
     }
 
     printf("testMap: trying to map too much (0x%x)...\n", size * 0x10);
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+    map_ptr = CMEM_map64(physp, size * 0x10);
+#else
     map_ptr = CMEM_map(physp, size * 0x10);
+#endif
     if (map_ptr != NULL) {
 	printf("testMap: CMEM_map() should've failed but didn't\n");
 	CMEM_unmap(map_ptr, size * 0x10);
@@ -596,11 +609,20 @@ cleanup:
 int testAllocPhys(size_t size)
 {
     int *map_ptr;
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+    off64_t physp;
+#else
     off_t physp;
+#endif
     int ret = 0;
 
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+    physp = CMEM_allocPhys64(0, size, NULL);
+    map_ptr = CMEM_map64(physp, size);
+#else
     physp = CMEM_allocPhys(size, NULL);
     map_ptr = CMEM_map(physp, size);
+#endif
     if (map_ptr == NULL) {
 	printf("testAllocPhys: CMEM_map() failed\n");
 	ret = 1;
@@ -624,7 +646,11 @@ int testAllocPhys(size_t size)
     CMEM_unmap(map_ptr, size);
 
     printf("testAllocPhys: trying to map too much (0x%x)...\n", size * 0x10);
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+    map_ptr = CMEM_map64(physp, size * 0x10);
+#else
     map_ptr = CMEM_map(physp, size * 0x10);
+#endif
     if (map_ptr != NULL) {
 	printf("testAllocPhys: CMEM_map() should've failed but didn't\n");
 	CMEM_unmap(map_ptr, size * 0x10);
@@ -632,7 +658,11 @@ int testAllocPhys(size_t size)
     }
 
 cleanup:
+#if defined(LINUXUTILS_BUILDOS_ANDROID)
+    CMEM_freePhys64(physp, NULL);
+#else
     CMEM_freePhys(physp, NULL);
+#endif
 
     return ret;
 }
