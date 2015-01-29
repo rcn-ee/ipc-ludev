@@ -57,7 +57,7 @@ int nblocks;
 int writereadCMA(size_t size)
 {
     int rv;
-    int i;
+    unsigned int i;
     CMEM_AllocParams params;
     char *heap_ptr;
 
@@ -292,7 +292,7 @@ void testCache(size_t size, int block)
     off_t physp_nocache;
     off_t physp_cache;
     int poolid;
-    int i, j;
+    unsigned int i, j;
     struct timeval start_tv, end_tv;
     unsigned long diff;
     int foo, bar;
@@ -534,8 +534,8 @@ cleanup:
 
 int testMap(size_t size)
 {
-    int *ptr;
-    int *map_ptr;
+    unsigned int *ptr;
+    unsigned int *map_ptr;
 #if defined(LINUXUTILS_BUILDOS_ANDROID)
     off64_t physp;
 #else
@@ -608,7 +608,7 @@ cleanup:
 
 int testAllocPhys(size_t size)
 {
-    int *map_ptr;
+    unsigned int *map_ptr;
 #if defined(LINUXUTILS_BUILDOS_ANDROID)
     off64_t physp;
 #else
