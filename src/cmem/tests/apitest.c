@@ -51,8 +51,12 @@
 #include <ti/cmem.h>
 
 #define NUMHEAPPTRS 0x1000
+#define FALSE 	0
+#define TRUE	1
+
 unsigned int *ptrs[NUMHEAPPTRS];
 int nblocks;
+unsigned int non_interactive_flag;
 
 int writereadCMA(size_t size)
 {
@@ -82,15 +86,21 @@ int writereadCMA(size_t size)
 	if (heap_ptr[i] != (i % 256)) {
 	    printf("write-read error: read 0x%x, should be 0x%x\n",
 	           heap_ptr[i], i % 256);
-	    printf("Press ENTER to continue\n");
-	    getchar();
-
+	    if (non_interactive_flag == FALSE) {
+		printf("Press ENTER to continue\n");
+		getchar();
+	    }
 	    break;
 	}
     }
     if (i == size) {
-	printf("...succeeded, press ENTER to continue\n");
-	getchar();
+	if (non_interactive_flag == FALSE) {
+	    printf("...succeeded, press ENTER to continue\n");
+	    getchar();
+	}	    
+	else {
+	    printf("...succeeded\n");
+	}
     }
 
     printf("calling CMEM_cacheInv(heap_ptr, size)...\n");
@@ -130,8 +140,10 @@ void testCMA(size_t size)
     }
     printf("...done, %d allocated\n", num_buffers);
 
-    printf("Press ENTER to continue\n");
-    getchar();
+    if (non_interactive_flag == FALSE) {
+	printf("Press ENTER to continue\n");
+	getchar();
+    }
 
     printf("freeing heap blocks...\n");
     for (i = 0; i < num_buffers; i++) {
@@ -192,8 +204,10 @@ void testHeap(size_t size, int block)
     }
     printf("...done, %d allocated\n", num_buffers);
 
-    printf("Press ENTER to continue\n");
-    getchar();
+    if (non_interactive_flag == FALSE) {
+	printf("Press ENTER to continue\n");
+	getchar();
+    }	
 
     printf("freeing heap blocks...\n");
     for (i = 0; i < num_buffers; i++) {
@@ -248,8 +262,10 @@ void testPools(size_t size, int block)
     }
     printf("...done, %d allocated\n", num_buffers);
 
-    printf("Press ENTER to continue\n");
-    getchar();
+    if (non_interactive_flag == FALSE) {
+	printf("Press ENTER to continue\n");
+	getchar();
+    }
 
     printf("freeing pool blocks...\n");
     for (i = 0; i < num_buffers; i++) {
@@ -489,10 +505,13 @@ void testCache(size_t size, int block)
         ptr2[i] = 0xfeebfeeb;
     }
 
-    printf("Inspect your memory map in /proc/%d/maps.\n", getpid());
-    printf("Also look at your pool info under /proc/cmem\n");
-    printf("Press ENTER to exit (after 'cat /proc/cmem' if desired).\n");
-    getchar();
+    if (non_interactive_flag == FALSE) {
+	printf("Inspect your memory map in /proc/%d/maps.\n", getpid());
+	printf("Also look at your pool info under /proc/cmem\n");
+
+	printf("Press ENTER to exit (after 'cat /proc/cmem' if desired).\n");
+	getchar();
+    }
 
 cleanup:
     if (ptr1_nocache != NULL) {
@@ -673,18 +692,38 @@ int main(int argc, char *argv[])
     int version;
     CMEM_BlockAttrs attrs;
     int i;
+    int c;
+    
+    non_interactive_flag = FALSE;
 
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <Number of bytes to allocate>\n", argv[0]);
-        exit(EXIT_FAILURE);
+    while ((c = getopt(argc, argv, "n")) != -1) {
+	switch (c) {
+	case 'n':
+	    non_interactive_flag = TRUE; 	
+	    break;
+
+	default:
+	    fprintf(stderr, "Usage: %s [-n] <Number of bytes to allocate>\n",
+		    argv[0]);
+	    fprintf(stderr,
+                    "    -n: non-interactive mode (no ENTER prompts)\n");
+	    exit(EXIT_FAILURE);
+	}
+    }
+
+    if ((argc - optind + 1) != 2) {
+	fprintf(stderr, "Usage: %s [-n] <Number of bytes to allocate>\n",
+	        argv[0]);
+	fprintf(stderr, "    -n: non-interactive mode (no ENTER prompts)\n");
+	exit(EXIT_FAILURE);
     }
 
     errno = 0;
-    size = strtol(argv[1], NULL, 0);
+    size = strtol(argv[optind], NULL, 0);
 
     if (errno) {
 	fprintf(stderr, "Bad argument ('%s'), strtol() set errno %d\n",
-	        argv[1], errno);
+	        argv[optind], errno);
         exit(EXIT_FAILURE);
     }
 
