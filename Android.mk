@@ -1,5 +1,5 @@
 #
-#   Copyright (c) 2014, Texas Instruments Incorporated
+#   Copyright (c) 2014-2015, Texas Instruments Incorporated
 #
 #   Redistribution and use in source and binary forms, with or without
 #   modification, are permitted provided that the following conditions
@@ -31,18 +31,67 @@
 
 LOCAL_PATH:= $(call my-dir)
 
-##### libticmem library #####
+############### libticmem library ###############
 include $(CLEAR_VARS)
 
-LU_ROOT := ../../../..
-
-LOCAL_C_INCLUDES += $(LOCAL_PATH)/$(LU_ROOT)/include
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/include
 
 LOCAL_CFLAGS += -D_FILE_OFFSET_BITS=64 -DLINUXUTILS_BUILDOS_ANDROID
 
 LOCAL_MODULE_TAGS:= optional
 
-LOCAL_SRC_FILES:= $(LU_ROOT)/src/cmem/api/cmem.c
+LOCAL_SRC_FILES:= src/cmem/api/cmem.c
 
 LOCAL_MODULE:= libticmem
 include $(BUILD_SHARED_LIBRARY)
+
+
+############### cmemApitest ###############
+include $(CLEAR_VARS)
+
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/include
+
+LOCAL_CFLAGS += -D_FILE_OFFSET_BITS=64 -DLINUXUTILS_BUILDOS_ANDROID
+
+LOCAL_MODULE_TAGS:= optional
+
+LOCAL_SRC_FILES:= src/cmem/tests/apitest.c
+
+LOCAL_SHARED_LIBRARIES := libticmem
+
+LOCAL_MODULE:= cmemApitest
+include $(BUILD_EXECUTABLE)
+
+
+############### cmemMultiprocess ###############
+include $(CLEAR_VARS)
+
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/include
+
+LOCAL_CFLAGS += -D_FILE_OFFSET_BITS=64 -DLINUXUTILS_BUILDOS_ANDROID
+
+LOCAL_MODULE_TAGS:= optional
+
+LOCAL_SRC_FILES:= src/cmem/tests/multi_process.c
+
+LOCAL_SHARED_LIBRARIES := libticmem
+
+LOCAL_MODULE:= cmemMultiprocess
+include $(BUILD_EXECUTABLE)
+
+
+############### cmemTranslate ###############
+include $(CLEAR_VARS)
+
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/include
+
+LOCAL_CFLAGS += -D_FILE_OFFSET_BITS=64 -DLINUXUTILS_BUILDOS_ANDROID
+
+LOCAL_MODULE_TAGS:= optional
+
+LOCAL_SRC_FILES:= src/cmem/tests/translate.c
+
+LOCAL_SHARED_LIBRARIES := libticmem
+
+LOCAL_MODULE:= cmemTranslate
+include $(BUILD_EXECUTABLE)
