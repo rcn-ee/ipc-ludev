@@ -2177,18 +2177,18 @@ int cl_config(void)
     }
 
     if (npools[1] > MAX_POOLS) {
-	__E("Too many pools specified (%d) for Block 0, only %d supported.\n", npools[1], MAX_POOLS);
+	__E("Too many pools specified (%d) for Block 1, only %d supported.\n", npools[1], MAX_POOLS);
 	return -EINVAL;
     }
 
     if (npools[2] > MAX_POOLS) {
-	__E("Too many pools specified (%d) for Block 0, only %d supported.\n", npools[1], MAX_POOLS);
+	__E("Too many pools specified (%d) for Block 2, only %d supported.\n", npools[2], MAX_POOLS);
 	return -EINVAL;
     }
 
 /* cut-and-paste below as part of adding support for more than 4 blocks */
     if (npools[3] > MAX_POOLS) {
-	__E("Too many pools specified (%d) for Block 0, only %d supported.\n", npools[1], MAX_POOLS);
+	__E("Too many pools specified (%d) for Block 3, only %d supported.\n", npools[3], MAX_POOLS);
 	return -EINVAL;
     }
 /* cut-and-paste above as part of adding support for more than 4 blocks */

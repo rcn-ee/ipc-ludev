@@ -213,7 +213,7 @@
  *              cmem_block_0: cmem_block@0 {
  *                      reg = <0>;
  *                      memory-region = <&cmem_block_mem_0>;
- *                      cmem-buf-pools = <1 0x0c000000>, <4 0x01000000>; // 1x256MB, 4x16MB pools
+ *                      cmem-buf-pools = <1 0x0c000000>, <4 0x01000000>; // 1x192MB, 4x16MB pools
  *              };
  *
  *              cmem_block_1: cmem_block@1 {
