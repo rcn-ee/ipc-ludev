@@ -2013,8 +2013,7 @@ static int release(struct inode *inode, struct file *filp)
 
 static void banner(void)
 {
-    printk(KERN_INFO "CMEMK module: built on " __DATE__ " at " __TIME__ "\n");
-    printk(KERN_INFO "  Reference Linux version %d.%d.%d\n",
+    printk(KERN_INFO "CMEMK module: reference Linux version %d.%d.%d\n",
            (LINUX_VERSION_CODE & 0x00ff0000) >> 16,
            (LINUX_VERSION_CODE & 0x0000ff00) >> 8,
            (LINUX_VERSION_CODE & 0x000000ff) >> 0
