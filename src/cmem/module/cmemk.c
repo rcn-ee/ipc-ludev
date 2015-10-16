@@ -2035,13 +2035,18 @@ int dt_config(void)
 {
     struct device_node *np, *block, *mem;
     int ret;
-    u32 tmp[MAX_POOLS * 2];
-    u32 addr;
-    u32 size;
+    u32 tmp[MAX_POOLS * 3];
+    unsigned long long addr;
+    unsigned long long size;
     int n, p;
+    int i;
     int num_pools;
-    int num_buffers;
-    int buffer_size;
+    int addr_cells;
+    int size_cells;
+    u32 num_buffers;
+    u32 pool_size_cells;
+    int ints_per_pool;
+    unsigned long long buffer_size;
     int block_num;
 
     np = of_find_compatible_node(NULL, NULL, "ti,cmem");
@@ -2056,6 +2061,12 @@ int dt_config(void)
 	__E("no child block node(s) found\n");
 	return -EINVAL;
     }
+
+    pool_size_cells = 1;
+    if (of_get_property(np, "#pool-size-cells", NULL) != NULL) {
+	of_property_read_u32(np, "#pool-size-cells", &pool_size_cells);
+    }
+    ints_per_pool = pool_size_cells + 1;
 
     block = NULL;
 
@@ -2082,27 +2093,43 @@ int dt_config(void)
 	if (mem) {
 	    __D("got memory-region\n");
 
-	    ret = of_property_read_u32_array(mem, "reg", tmp, 2);
+	    addr_cells = of_n_addr_cells(mem);
+	    size_cells = of_n_size_cells(mem);
+
+	    ret = of_property_read_u32_array(mem, "reg", tmp,
+	                                     addr_cells + size_cells);
 	    if (ret) {
 		return ret;
 	    }
-	    addr = tmp[0];
-	    size = tmp[1];
+
+	    addr = 0;
+	    for (i = 0; i < addr_cells; i++) {
+		addr <<= 32;
+		addr |= tmp[i];
+	    }
+	    size = 0;
+	    for (i = 0; i < size_cells; i++) {
+		size <<= 32;
+		size |= tmp[addr_cells + i];
+	    }
 
 	    block_start[block_num] = addr;
 	    block_end[block_num] = addr + size;
 
-	    __D("got addr size: 0x%x 0x%x\n", addr, size);
+	    __D("got addr size: %#llx %#llx\n", addr, size);
 
 	    num_pools = 0;
 	    if (of_get_property(block, "cmem-buf-pools", &n) != NULL) {
-		/* n is number of bytes, need multiple of 8 */
-		if ((n % 8) != 0) {
-			__E("bad cmem-buf-pools: must be even number of ints\n");
+		/*
+		 * n is number of bytes, need multiple of (ints_per_pool * 4)
+		 */
+		if ((n % (ints_per_pool * 4)) != 0) {
+			__E("bad cmem-buf-pools: must be multiple of %d ints\n",
+			    ints_per_pool);
 			return -EINVAL;
 		}
 
-                num_pools = n / 8;
+                num_pools = n / (ints_per_pool * 4);
 	    }
 
             if (num_pools > MAX_POOLS) {
@@ -2115,21 +2142,27 @@ int dt_config(void)
 
 	    npools[block_num] = num_pools;
 	    if (num_pools) {
-		ret = of_property_read_u32_array(block, "cmem-buf-pools",
-					         tmp, n / 4);
+		ret = of_property_read_u32_array(block, "cmem-buf-pools", tmp,
+		                                 ints_per_pool * num_pools);
 		if (!ret) {
 		    n = 0;
 		    p = 0;
 		    while (num_pools) {
-			num_buffers = tmp[n++];
-			buffer_size = tmp[n++];
+			num_buffers = tmp[n];
+
+			buffer_size = 0;
+			for (i = 0; i < pool_size_cells; i++) {
+				buffer_size <<= 32;
+				buffer_size |= tmp[n + i + 1];
+			}
 			pool_num_buffers[block_num][p] = num_buffers;
 			pool_size[block_num][p] = buffer_size;
 
 			num_pools--;
 			p++;
+			n += ints_per_pool;
 
-			__D("got a pool: %d x 0x%x\n",
+			__D("got a pool: %d x %#llx\n",
 			    num_buffers, buffer_size);
 		    }
 		}
@@ -2590,6 +2623,8 @@ module_init(cmem_init);
 module_exit(cmem_exit);
 
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
+
 #if !defined(MULTI_CACHE)
 
 #warning "MULTI_CACHE is *not* #defined, using work-around for asm cache functions"
@@ -2711,7 +2746,6 @@ arm926_dma_flush_range:\n \
 ");
 
 #else  /* CONFIG_CPU_ARM926T */
-#if 1
 
 /*
  *	v7_dma_inv_range(start,end)
@@ -2846,7 +2880,8 @@ v7_dma_unmap_area:\n \
 	mov	pc, lr\n \
 ");
 
-#endif
 #endif /* CONFIG_CPU_ARM926T */
 
 #endif /* !defined(MULTI_CACHE) */
+
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0) */
