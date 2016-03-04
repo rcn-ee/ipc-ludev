@@ -228,7 +228,9 @@ static int cmem_cma_npools = 0;
 static int cmem_cma_heapsize = 0;
 static struct device *cmem_cma_dev;
 static struct pool_object *cmem_cma_p_objs;
-
+#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
+static struct device *cmem_cma_dev_0;
+#endif
 #endif
 
 /*
@@ -1153,7 +1155,11 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 
 		if (cmem_cma_heapsize == 0) {
 		    __D("no explicit CMEM CMA heap, using global area\n");
+#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
+		    dev = cmem_cma_dev_0;
+#else
 		    dev = NULL;
+#endif
 		}
 		else {
 		    dev = &cmem_cma_dev[heap_pool[bi]];
@@ -2326,8 +2332,15 @@ int __init cmem_init(void)
 	goto fail_after_reg;
     }
 
-    device_create(cmem_class, NULL, MKDEV(cmem_major, 0), NULL, "cmem");
+#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
+    cmem_cma_dev_0 = device_create(cmem_class, NULL, MKDEV(cmem_major, 0),
+				   NULL, "cmem");
 
+    cmem_cma_dev_0->coherent_dma_mask = DMA_BIT_MASK(32);
+    cmem_cma_dev_0->dma_pfn_offset = 0x780000UL;
+#else
+    device_create(cmem_class, NULL, MKDEV(cmem_major, 0), NULL, "cmem");
+#endif
     for (bi = 0; bi < NBLOCKS; bi++) {
 	if (!block_start[bi] || !block_end[bi]) {
             if (bi != 0) {
@@ -2454,7 +2467,9 @@ int __init cmem_init(void)
 	    p_objs[NBLOCKS][i].numbufs = cmem_cma_p_objs[i].numbufs;
 
 	    cmem_cma_dev[i].coherent_dma_mask = DMA_BIT_MASK(32);
-
+#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
+	    cmem_cma_dev[i].dma_pfn_offset = 0x780000UL;
+#endif
 	    __D("    pool %d: size=%#llx numbufs=%d\n", i,
 	        p_objs[NBLOCKS][i].size, p_objs[NBLOCKS][i].numbufs);
 	}
