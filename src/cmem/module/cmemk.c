@@ -231,6 +231,7 @@ static struct pool_object *cmem_cma_p_objs;
 #if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
 	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 static struct device *cmem_cma_dev_0;
+#define KEYSTONE_DMA_PFN_OFFSET 0x780000UL
 #endif
 #endif
 
@@ -1206,7 +1207,9 @@ alloc:
 #if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
 	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 		/* adjust from 32-bit alias to 36-bit phys */
-		physp = dma + 0x780000000ULL;
+		physp = dma
+			+ ((unsigned long long)KEYSTONE_DMA_PFN_OFFSET
+			   << PAGE_SHIFT);
 #else
 		physp = dma;
 #endif
@@ -2341,7 +2344,7 @@ int __init cmem_init(void)
 				   NULL, "cmem");
 
     cmem_cma_dev_0->coherent_dma_mask = DMA_BIT_MASK(32);
-    cmem_cma_dev_0->dma_pfn_offset = 0x780000UL;
+    cmem_cma_dev_0->dma_pfn_offset = KEYSTONE_DMA_PFN_OFFSET;
 #else
     device_create(cmem_class, NULL, MKDEV(cmem_major, 0), NULL, "cmem");
 #endif
@@ -2473,7 +2476,7 @@ int __init cmem_init(void)
 	    cmem_cma_dev[i].coherent_dma_mask = DMA_BIT_MASK(32);
 #if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
 	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
-	    cmem_cma_dev[i].dma_pfn_offset = 0x780000UL;
+	    cmem_cma_dev[i].dma_pfn_offset = KEYSTONE_DMA_PFN_OFFSET;
 #endif
 	    __D("    pool %d: size=%#llx numbufs=%d\n", i,
 	        p_objs[NBLOCKS][i].size, p_objs[NBLOCKS][i].numbufs);
