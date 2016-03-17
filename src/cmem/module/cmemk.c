@@ -228,7 +228,8 @@ static int cmem_cma_npools = 0;
 static int cmem_cma_heapsize = 0;
 static struct device *cmem_cma_dev;
 static struct pool_object *cmem_cma_p_objs;
-#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
+#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
+	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 static struct device *cmem_cma_dev_0;
 #endif
 #endif
@@ -1155,7 +1156,8 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 
 		if (cmem_cma_heapsize == 0) {
 		    __D("no explicit CMEM CMA heap, using global area\n");
-#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
+#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
+	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 		    dev = cmem_cma_dev_0;
 #else
 		    dev = NULL;
@@ -1201,7 +1203,8 @@ alloc:
 	    if (bi == NBLOCKS) {
 		virtp = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
 
-#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
+#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
+	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 		/* adjust from 32-bit alias to 36-bit phys */
 		physp = dma + 0x780000000ULL;
 #else
@@ -2332,7 +2335,8 @@ int __init cmem_init(void)
 	goto fail_after_reg;
     }
 
-#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
+#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
+	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
     cmem_cma_dev_0 = device_create(cmem_class, NULL, MKDEV(cmem_major, 0),
 				   NULL, "cmem");
 
@@ -2467,7 +2471,8 @@ int __init cmem_init(void)
 	    p_objs[NBLOCKS][i].numbufs = cmem_cma_p_objs[i].numbufs;
 
 	    cmem_cma_dev[i].coherent_dma_mask = DMA_BIT_MASK(32);
-#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
+#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
+	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 	    cmem_cma_dev[i].dma_pfn_offset = 0x780000UL;
 #endif
 	    __D("    pool %d: size=%#llx numbufs=%d\n", i,
