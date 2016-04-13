@@ -228,11 +228,12 @@ static int cmem_cma_npools = 0;
 static int cmem_cma_heapsize = 0;
 static struct device *cmem_cma_dev;
 static struct pool_object *cmem_cma_p_objs;
+#endif
+
+static struct device *cmem_cma_dev_0;
 #if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
 	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
-static struct device *cmem_cma_dev_0;
 #define KEYSTONE_DMA_PFN_OFFSET 0x780000UL
-#endif
 #endif
 
 /*
@@ -1141,12 +1142,7 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 
 		if (cmem_cma_heapsize == 0) {
 		    __D("no explicit CMEM CMA heap, using global area\n");
-#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
-	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 		    dev = cmem_cma_dev_0;
-#else
-		    dev = NULL;
-#endif
 		}
 		else {
 		    dev = &cmem_cma_dev[heap_pool[bi]];
@@ -2322,15 +2318,13 @@ int __init cmem_init(void)
 	goto fail_after_reg;
     }
 
-#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
-	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
+    /* Create cmem device */
     cmem_cma_dev_0 = device_create(cmem_class, NULL, MKDEV(cmem_major, 0),
 				   NULL, "cmem");
-
+#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
+	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
     cmem_cma_dev_0->coherent_dma_mask = DMA_BIT_MASK(32);
     cmem_cma_dev_0->dma_pfn_offset = KEYSTONE_DMA_PFN_OFFSET;
-#else
-    device_create(cmem_class, NULL, MKDEV(cmem_major, 0), NULL, "cmem");
 #endif
     for (bi = 0; bi < NBLOCKS; bi++) {
 	if (!block_start[bi] || !block_end[bi]) {
