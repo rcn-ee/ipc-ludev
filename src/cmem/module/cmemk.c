@@ -917,17 +917,17 @@ static void *cmem_seq_next(struct seq_file *s, void *v, loff_t *pos)
     return listp;
 }
 
-int show_busy_banner(int bi, struct seq_file *s, int n)
+void show_busy_banner(int bi, struct seq_file *s, int n)
 {
-    return seq_printf(s, "\nBlock %d: Pool %d: %d bufs size 0x%llx"
+    seq_printf(s, "\nBlock %d: Pool %d: %d bufs size 0x%llx"
                       " (0x%llx requested)\n\nPool %d busy bufs:\n",
                       bi, n, p_objs[bi][n].numbufs, p_objs[bi][n].size,
                       p_objs[bi][n].reqsize, n);
 }
 
-int show_free_banner(struct seq_file *s, int n)
+void show_free_banner(struct seq_file *s, int n)
 {
-    return seq_printf(s, "\nPool %d free bufs:\n", n);
+    seq_printf(s, "\nPool %d free bufs:\n", n);
 }
 
 /*
@@ -942,7 +942,6 @@ static int cmem_seq_show(struct seq_file *s, void *v)
     char *attr;
     int i;
     int bi;
-    int rv;
 
     __D("cmem_seq_show:\n");
 
@@ -985,36 +984,21 @@ static int cmem_seq_show(struct seq_file *s, void *v)
 
     entry = list_entry(e, struct pool_buffer, element);
 
-    /*
-     * Check the final seq_printf return value.  No need to check previous
-     * ones, since if they fail then the seq_file object is not changed and
-     * any subsequent seq_printf will also fail w/o changing the object.
-     */
     if ((int)s->private & BUSY_ENTRY) {
 	attr = entry->flags & CMEM_CACHED ? "(cached)" : "(noncached)";
-	rv = seq_printf(s, "id %d: phys addr %#llx %s\n", entry->id,
+	seq_printf(s, "id %d: phys addr %#llx %s\n", entry->id,
                    (unsigned long long)entry->physp, attr);
     }
     else {
-	rv = seq_printf(s, "id %d: phys addr %#llx\n", entry->id,
+	seq_printf(s, "id %d: phys addr %#llx\n", entry->id,
 	                (unsigned long long)entry->physp);
-    }
-    if (rv == -1) {
-	__D("seq_printf returned -1\n");
-
-	return -1;
     }
 
     if ((int)s->private & BUSY_ENTRY &&
         (int)s->private & SHOW_LAST_FREE_BANNER) {
 
 	/* FIXME */
-	rv = show_free_banner(s, npools[0] - 1);
-	if (rv == -1) {
-	    __D("seq_printf returned -1\n");
-
-	    return -1;
-	}
+	show_free_banner(s, npools[0] - 1);
     }
 
     return 0;
