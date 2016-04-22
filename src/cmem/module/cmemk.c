@@ -1426,8 +1426,9 @@ alloc:
 			     * HeapMem_free()
 			     */
 			    virtp_end = virtp + size;
-			    outer_inv_range(physp, physp + size);
-			    dmac_map_area(virtp, size, DMA_FROM_DEVICE);
+			    dma_sync_single_for_cpu(dev,
+			        virt_to_dma(dev, virtp),
+			        size, DMA_FROM_DEVICE);
 
 			    __D("FREEHEAP: invalidated user virtual "
 			        "0x%p -> 0x%p\n", virtp, virtp_end);
@@ -1697,8 +1698,9 @@ alloc:
 
 	    switch (cmd & ~CMEM_IOCMAGIC) {
 	      case CMEM_IOCCACHEWB:
-		dmac_map_area(virtp, block.size, DMA_TO_DEVICE);
-		outer_clean_range(physp, physp + block.size);
+		dma_sync_single_for_device(dev,
+		    virt_to_dma(dev, virtp),
+		    block.size, DMA_TO_DEVICE);
 
 		__D("CACHEWB: cleaned user virtual 0x%p -> 0x%p\n",
 		       virtp, virtp_end);
@@ -1706,8 +1708,9 @@ alloc:
 		break;
 
 	      case CMEM_IOCCACHEINV:
-		outer_inv_range(physp, physp + block.size);
-		dmac_map_area(virtp, block.size, DMA_FROM_DEVICE);
+		dma_sync_single_for_cpu(dev,
+		    virt_to_dma(dev, virtp),
+		    block.size, DMA_FROM_DEVICE);
 
 		__D("CACHEINV: invalidated user virtual 0x%p -> 0x%p\n",
 		       virtp, virtp_end);
@@ -1715,8 +1718,9 @@ alloc:
 		break;
 
 	      case CMEM_IOCCACHEWBINV:
-		dmac_map_area(virtp, block.size, DMA_BIDIRECTIONAL);
-		outer_flush_range(physp, physp + block.size);
+		dma_sync_single_for_cpu(dev,
+		    virt_to_dma(dev, virtp),
+		    block.size, DMA_BIDIRECTIONAL);
 
 		__D("CACHEWBINV: flushed user virtual 0x%p -> 0x%p\n",
 		       virtp, virtp_end);
