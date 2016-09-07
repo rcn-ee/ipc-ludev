@@ -1703,9 +1703,9 @@ alloc:
 
 	    switch (cmd & ~CMEM_IOCMAGIC) {
 	      case CMEM_IOCCACHEWB:
-
 		dmac_map_area(virtp, block.size, DMA_TO_DEVICE);
 		outer_clean_range(physp, physp + block.size);
+
 		__D("CACHEWB: cleaned user virtual 0x%p -> 0x%p\n",
 		       virtp, virtp_end);
 
@@ -1714,14 +1714,16 @@ alloc:
 	      case CMEM_IOCCACHEINV:
 		outer_inv_range(physp, physp + block.size);
 		dmac_map_area(virtp, block.size, DMA_FROM_DEVICE);
+
 		__D("CACHEINV: invalidated user virtual 0x%p -> 0x%p\n",
 		       virtp, virtp_end);
 
 		break;
 
 	      case CMEM_IOCCACHEWBINV:
-		__cpuc_flush_dcache_area(virtp, size);
+		dmac_map_area(virtp, block.size, DMA_BIDIRECTIONAL);
 		outer_flush_range(physp, physp + block.size);
+
 		__D("CACHEWBINV: flushed user virtual 0x%p -> 0x%p\n",
 		       virtp, virtp_end);
 
