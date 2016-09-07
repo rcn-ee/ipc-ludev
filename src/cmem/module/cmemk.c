@@ -2626,3 +2626,267 @@ void __exit cmem_exit(void)
 MODULE_LICENSE("GPL");
 module_init(cmem_init);
 module_exit(cmem_exit);
+
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
+
+#if !defined(MULTI_CACHE)
+
+#warning "MULTI_CACHE is *not* #defined, using work-around for asm cache functions"
+
+#ifdef CONFIG_CPU_ARM926T
+
+/*
+ * The following assembly functions were taken from
+ *     arch/arm/mm/proc-arm926.S
+ * Since we can't use the C preprocessor to evaluate #defines, the
+ * code that was taken is the code encapsulated by
+ *     #ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
+ *     ...
+ *     #endif
+ * (note that this is #ifndef, i.e., #if !defined)
+ */
+
+/*
+ * the cache line size of the I and D cache
+ */
+/*
+ * Leave here for documentation purposes, but we don't use it since
+ * asm("") statements won't get preprocessed (inside a string).
+ */
+#define CACHE_DLINESIZE 32
+
+asm("\n \
+        .global arm926_dma_map_area\n \
+arm926_dma_map_area:\n \
+        add     r1, r1, r0\n \
+@        cmp     r2, #DMA_TO_DEVICE\n \
+        cmp     r2, #1\n \
+        beq     arm926_dma_clean_range\n \
+        bcs     arm926_dma_inv_range\n \
+        b       arm926_dma_flush_range\n \
+");
+
+/*
+ *      dma_inv_range(start, end)
+ *
+ *      Invalidate (discard) the specified virtual address range.
+ *      May not write back any entries.  If 'start' or 'end'
+ *      are not cache line aligned, those lines must be written
+ *      back.
+ *
+ *      - start - virtual start address
+ *      - end   - virtual end address
+ *
+ * (same as v4wb)
+ENTRY(arm926_dma_inv_range)
+ */
+asm("\n \
+	.global arm926_dma_inv_range\n \
+arm926_dma_inv_range:\n \
+@        tst     r0, #CACHE_DLINESIZE - 1\n \
+        tst     r0, #32 - 1\n \
+        mcrne   p15, 0, r0, c7, c10, 1          @ clean D entry\n \
+@        tst     r1, #CACHE_DLINESIZE - 1\n \
+        tst     r1, #32 - 1\n \
+        mcrne   p15, 0, r1, c7, c10, 1          @ clean D entry\n \
+@        bic     r0, r0, #CACHE_DLINESIZE - 1\n \
+        bic     r0, r0, #32 - 1\n \
+1:      mcr     p15, 0, r0, c7, c6, 1           @ invalidate D entry\n \
+@        add     r0, r0, #CACHE_DLINESIZE\n \
+        add     r0, r0, #32\n \
+        cmp     r0, r1\n \
+        blo     1b\n \
+        mcr     p15, 0, r0, c7, c10, 4          @ drain WB\n \
+        mov     pc, lr\n \
+");
+
+/*
+ *      dma_clean_range(start, end)
+ *
+ *      Clean the specified virtual address range.
+ *
+ *      - start - virtual start address
+ *      - end   - virtual end address
+ *
+ * (same as v4wb)
+ENTRY(arm926_dma_clean_range)
+ */
+asm("\n \
+	.global arm926_dma_clean_range\n \
+arm926_dma_clean_range:\n \
+@        bic     r0, r0, #CACHE_DLINESIZE - 1\n \
+        bic     r0, r0, #32 - 1\n \
+1:      mcr     p15, 0, r0, c7, c10, 1          @ clean D entry\n \
+@        add     r0, r0, #CACHE_DLINESIZE\n \
+        add     r0, r0, #32\n \
+        cmp     r0, r1\n \
+        blo     1b\n \
+        mcr     p15, 0, r0, c7, c10, 4          @ drain WB\n \
+        mov     pc, lr\n \
+");
+
+/*
+ *      dma_flush_range(start, end)
+ *
+ *      Clean and invalidate the specified virtual address range.
+ *
+ *      - start - virtual start address
+ *      - end   - virtual end address
+ENTRY(arm926_dma_flush_range)
+ */
+asm("\n \
+	.global arm926_dma_flush_range\n \
+arm926_dma_flush_range:\n \
+@        bic     r0, r0, #CACHE_DLINESIZE - 1\n \
+        bic     r0, r0, #32 - 1\n \
+1:\n \
+        mcr     p15, 0, r0, c7, c14, 1          @ clean+invalidate D entry\n \
+@        add     r0, r0, #CACHE_DLINESIZE\n \
+        add     r0, r0, #32\n \
+        cmp     r0, r1\n \
+        blo     1b\n \
+        mcr     p15, 0, r0, c7, c10, 4          @ drain WB\n \
+        mov     pc, lr\n \
+");
+
+#else  /* CONFIG_CPU_ARM926T */
+
+/*
+ *	v7_dma_inv_range(start,end)
+ *
+ *	Invalidate the data cache within the specified region; we will
+ *	be performing a DMA operation in this region and we want to
+ *	purge old data in the cache.
+ *
+ *	- start   - virtual start address of region
+ *	- end     - virtual end address of region
+ */
+asm("\n \
+	.global v7_dma_inv_range\n \
+v7_dma_inv_range:\n \
+@	dcache_line_size r2, r3\n \
+        mrc     p15, 0, r3, c0, c0, 1         @ read ctr\n \
+        lsr     r3, r3, #16\n \
+        and     r3, r3, #0xf                @ cache line size encoding\n \
+        mov     r2, #4                        @ bytes per word\n \
+        mov     r2, r2, lsl r3            @ actual cache line size\n \
+\n \
+	sub	r3, r2, #1\n \
+	tst	r0, r3\n \
+	bic	r0, r0, r3\n \
+@ #ifdef CONFIG_ARM_ERRATA_764369\n \
+@ 	ALT_SMP(W(dsb))\n \
+@ 	ALT_UP(W(nop))\n \
+@ #endif\n \
+	mcrne	p15, 0, r0, c7, c14, 1		@ clean & invalidate D / U line\n \
+	tst	r1, r3\n \
+	bic	r1, r1, r3\n \
+	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D / U line\n \
+1:\n \
+	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D / U line\n \
+	add	r0, r0, r2\n \
+	cmp	r0, r1\n \
+	blo	1b\n \
+	dsb\n \
+	mov	pc, lr\n \
+");
+
+/*
+ *	v7_dma_clean_range(start,end)
+ *	- start   - virtual start address of region
+ *	- end     - virtual end address of region
+ */
+asm("\n \
+	.global v7_dma_clean_range\n \
+v7_dma_clean_range:\n \
+@	dcache_line_size r2, r3\n \
+        mrc     p15, 0, r3, c0, c0, 1         @ read ctr\n \
+        lsr     r3, r3, #16\n \
+        and     r3, r3, #0xf                @ cache line size encoding\n \
+        mov     r2, #4                        @ bytes per word\n \
+        mov     r2, r2, lsl r3            @ actual cache line size\n \
+\n \
+	sub	r3, r2, #1\n \
+	bic	r0, r0, r3\n \
+@ #ifdef CONFIG_ARM_ERRATA_764369\n \
+@ 	ALT_SMP(W(dsb))\n \
+@ 	ALT_UP(W(nop))\n \
+@ #endif\n \
+1:\n \
+	mcr	p15, 0, r0, c7, c10, 1		@ clean D / U line\n \
+	add	r0, r0, r2\n \
+	cmp	r0, r1\n \
+	blo	1b\n \
+	dsb\n \
+	mov	pc, lr\n \
+");
+
+/*
+ *	v7_dma_flush_range(start,end)
+ *	- start   - virtual start address of region
+ *	- end     - virtual end address of region
+ */
+asm("\n \
+	.global v7_dma_flush_range\n \
+v7_dma_flush_range:\n \
+@	dcache_line_size r2, r3\n \
+        mrc     p15, 0, r3, c0, c0, 1         @ read ctr\n \
+        lsr     r3, r3, #16\n \
+        and     r3, r3, #0xf                @ cache line size encoding\n \
+        mov     r2, #4                        @ bytes per word\n \
+        mov     r2, r2, lsl r3            @ actual cache line size\n \
+\n \
+	sub	r3, r2, #1\n \
+	bic	r0, r0, r3\n \
+@ #ifdef CONFIG_ARM_ERRATA_764369\n \
+@ 	ALT_SMP(W(dsb))\n \
+@ 	ALT_UP(W(nop))\n \
+@ #endif\n \
+1:\n \
+	mcr	p15, 0, r0, c7, c14, 1		@ clean & invalidate D / U line\n \
+	add	r0, r0, r2\n \
+	cmp	r0, r1\n \
+	blo	1b\n \
+	dsb\n \
+	mov	pc, lr\n \
+");
+
+/*
+ *	dma_map_area(start, size, dir)
+ *	- start	- kernel virtual start address
+ *	- size	- size of region
+ *	- dir	- DMA direction
+ */
+asm("\n \
+	.global v7_dma_map_area\n \
+v7_dma_map_area:\n \
+	add	r1, r1, r0\n \
+@        cmp     r2, #DMA_TO_DEVICE\n \
+        cmp     r2, #1\n \
+        beq     v7_dma_clean_range\n \
+        bcs     v7_dma_inv_range\n \
+        b       v7_dma_flush_range\n \
+");
+
+/*
+ *	dma_unmap_area(start, size, dir)
+ *	- start	- kernel virtual start address
+ *	- size	- size of region
+ *	- dir	- DMA direction
+ */
+asm("\n \
+	.global v7_dma_unmap_area\n \
+v7_dma_unmap_area:\n \
+	add	r1, r1, r0\n \
+@	teq	r2, #DMA_TO_DEVICE\n \
+	teq	r2, #1\n \
+	bne	v7_dma_inv_range\n \
+	mov	pc, lr\n \
+");
+
+#endif /* CONFIG_CPU_ARM926T */
+
+#endif /* !defined(MULTI_CACHE) */
+
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0) */
