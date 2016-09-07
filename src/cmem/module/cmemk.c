@@ -236,6 +236,13 @@ static struct device *cmem_cma_dev_0;
 #define KEYSTONE_DMA_PFN_OFFSET 0x780000UL
 #endif
 
+#if !defined(dmac_map_area)
+#if !defined(MULTI_CACHE)
+/* Add prototypes for dmac_map_area */
+#define dmac_map_area                   __glue(_CACHE,_dma_map_area)
+void dmac_map_area(const void *, size_t, int);
+#endif
+#endif
 /*
  * For CMA allocations we treat p_objs[NBLOCKS] as a special "pool" array.
  */
@@ -1426,10 +1433,8 @@ alloc:
 			     * HeapMem_free()
 			     */
 			    virtp_end = virtp + size;
-			    dma_sync_single_for_cpu(dev,
-			        virt_to_dma(dev, virtp),
-			        size, DMA_FROM_DEVICE);
-
+			    outer_inv_range(physp, physp + size);
+			    dmac_map_area(virtp, size, DMA_FROM_DEVICE);
 			    __D("FREEHEAP: invalidated user virtual "
 			        "0x%p -> 0x%p\n", virtp, virtp_end);
 			}
@@ -1698,30 +1703,25 @@ alloc:
 
 	    switch (cmd & ~CMEM_IOCMAGIC) {
 	      case CMEM_IOCCACHEWB:
-		dma_sync_single_for_device(dev,
-		    virt_to_dma(dev, virtp),
-		    block.size, DMA_TO_DEVICE);
 
+		dmac_map_area(virtp, block.size, DMA_TO_DEVICE);
+		outer_clean_range(physp, physp + block.size);
 		__D("CACHEWB: cleaned user virtual 0x%p -> 0x%p\n",
 		       virtp, virtp_end);
 
 		break;
 
 	      case CMEM_IOCCACHEINV:
-		dma_sync_single_for_cpu(dev,
-		    virt_to_dma(dev, virtp),
-		    block.size, DMA_FROM_DEVICE);
-
+		outer_inv_range(physp, physp + block.size);
+		dmac_map_area(virtp, block.size, DMA_FROM_DEVICE);
 		__D("CACHEINV: invalidated user virtual 0x%p -> 0x%p\n",
 		       virtp, virtp_end);
 
 		break;
 
 	      case CMEM_IOCCACHEWBINV:
-		dma_sync_single_for_cpu(dev,
-		    virt_to_dma(dev, virtp),
-		    block.size, DMA_BIDIRECTIONAL);
-
+		__cpuc_flush_dcache_area(virtp, size);
+		outer_flush_range(physp, physp + block.size);
 		__D("CACHEWBINV: flushed user virtual 0x%p -> 0x%p\n",
 		       virtp, virtp_end);
 
@@ -2627,12 +2627,11 @@ MODULE_LICENSE("GPL");
 module_init(cmem_init);
 module_exit(cmem_exit);
 
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
+#if  !defined(dmac_map_range)
 
 #if !defined(MULTI_CACHE)
 
-#warning "MULTI_CACHE is *not* #defined, using work-around for asm cache functions"
+//#warning "dmac_map_range is *not* #defined, using work-around for asm cache functions"
 
 #ifdef CONFIG_CPU_ARM926T
 
@@ -2889,4 +2888,4 @@ v7_dma_unmap_area:\n \
 
 #endif /* !defined(MULTI_CACHE) */
 
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0) */
+#endif /* dmac_map_range */
