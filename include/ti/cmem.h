@@ -353,6 +353,7 @@ extern "C" {
 #define CMEM_IOCREGUSER                 10
 #define CMEM_IOCGETNUMBLOCKS            11
 #define CMEM_IOCCACHEWBINVALL           12
+#define CMEM_IOCEXPORTDMABUF            13
 /*
  * New ioctl cmds should use integers greater than the largest current cmd
  * in order to not break backward compatibility.
@@ -385,6 +386,11 @@ typedef struct CMEM_AllocParams {
 struct CMEM_block_struct {
     void *addr;
     size_t size;
+};
+
+struct CMEM_dmabufDesc {
+	void *virtp;
+	int fd_dmabuf;
 };
 
 extern CMEM_AllocParams CMEM_DEFAULTPARAMS;
@@ -1084,6 +1090,27 @@ int CMEM_getBlockAttrs(int blockid, CMEM_BlockAttrs *pattrs);
  * @sa  CMEM_getBlockAttrs()
  */
 int CMEM_getNumBlocks(int *pnblocks);
+
+/**
+ * @brief export as dma_buf a buffer previously allocated with
+ *        CMEM_alloc()/CMEM_allocPool().
+ *
+ * @param   ptr     The pointer to the buffer.
+ *
+ *
+ * @return 0 for success or -1 for failure.
+ *
+ * @pre Must have called CMEM_init()
+ *
+ * @sa CMEM_alloc()
+ * @sa CMEM_alloc2()
+ * @sa CMEM_allocPool()
+ * @sa CMEM_allocPool2()
+ * @sa CMEM_registerAlloc()
+ * @sa CMEM_unregister()
+ */
+
+int CMEM_export_dmabuf(void *ptr);
 
 /**
  * @brief Finalize the CMEM module.

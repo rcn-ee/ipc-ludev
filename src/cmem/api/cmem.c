@@ -767,6 +767,29 @@ int CMEM_freePhys(off_t physp, CMEM_AllocParams *params)
     return 0;
 }
 
+int CMEM_export_dmabuf(void *ptr)
+{
+    struct CMEM_dmabufDesc dmabuf_desc;
+
+    __D("export_dmabuf: entered w/ addr %p\n", ptr);
+
+    if (!validate_init()) {
+	return 0;
+    }
+
+    dmabuf_desc.virtp = ptr;
+    if (ioctl(cmem_fd, CMEM_IOCEXPORTDMABUF | CMEM_IOCMAGIC, &dmabuf_desc) == -1) {
+        __E("export_dmabuf: Failed to export to dmabuf %#x\n",
+            (unsigned int)ptr);
+        return 0;
+    }
+
+    __D("export_dmabuf: exiting, ioctl CMEM_IOCEXPORTDMABUF succeeded, returning %d\n",
+        dmabuf_desc.fd_dmabuf);
+
+    return dmabuf_desc.fd_dmabuf;
+}
+
 int CMEM_unregister(void *ptr, CMEM_AllocParams *params)
 {
     __D("unregister: delegating to CMEM_free()...\n");

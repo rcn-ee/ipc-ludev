@@ -45,7 +45,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/of_platform.h>
-
+#include <linux/dma-buf.h>
 /*
  * USE_MMAPSEM means acquire/release current->mm->mmap_sem around calls
  * to dma_[flush/clean/inv]_range.
@@ -200,12 +200,18 @@ typedef struct pool_buffer {
     void *kvirtp;		/* used only for CMA-based allocs */
     unsigned long long size;	/* used only for heap-based allocs */
     struct device *dev;		/* used only for CMA-based allocs */
+    struct vm_struct *vma;
 } pool_buffer;
 
 typedef struct registered_user {
     struct list_head element;
     struct file *filp;
 } registered_user;
+
+struct cmem_dmabuf_attachment {
+	struct sg_table *sgt;
+	enum dma_data_direction dir;
+};
 
 #ifdef CMEM_KERNEL_STUB
 
@@ -1099,6 +1105,281 @@ static int alloc_pool(int bi, int idx, int num, unsigned long long reqsize, phys
     return 0;
 }
 
+static int mmap_buffer(struct pool_buffer *entry, struct vm_area_struct *vma,
+	unsigned long size)
+{
+
+	if (size > entry->size) {
+		__E("mmap_buffer: requested size %#llx too big (should be <= %#llx)\n",
+		    (unsigned long long)size, (unsigned long long)entry->size);
+
+		return -EINVAL;
+	}
+
+	if (entry->flags & CMEM_CACHED) {
+		vma->vm_page_prot = __pgprot(pgprot_val(vma->vm_page_prot) |
+			(L_PTE_MT_WRITEALLOC | L_PTE_MT_BUFFERABLE));
+	}
+	else {
+		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+	}
+	vma->vm_flags |= VM_RESERVED | VM_IO;
+
+	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff, size,
+			    vma->vm_page_prot)) {
+		__E("mmap_buffer: failed remap_pfn_range\n");
+
+		return -EAGAIN;
+	}
+	return 0;
+}
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+
+static int cmem_dmabuf_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
+{
+	struct pool_buffer *entry = dmabuf->priv;
+	unsigned long size = vma->vm_end - vma->vm_start;
+
+	__D("cmem_dmabuf_mmap: vma->vm_start     = %#lx\n", vma->vm_start);
+	__D("cmem_dmabuf_mmap: vma->vm_end       = %#lx\n", vma->vm_end);
+	__D("cmem_dmabuf_mmap: size              = %#lx\n", size);
+	__D("cmem_dmabuf_mmap: vma->vm_pgoff     = %#lx\n", vma->vm_pgoff);
+
+	if (entry == NULL)
+		return -EAGAIN;
+
+	/* Use the physical address from buffer to map */
+	vma->vm_pgoff = entry->physp >> PAGE_SHIFT;
+
+	return mmap_buffer(entry, vma, size);
+}
+
+/**
+ * cmem_dmabuf_release - dma_buf release implementation
+ * @dma_buf: buffer to be released
+ *
+ */
+static void cmem_dma_buf_release(struct dma_buf *dma_buf)
+{
+}
+
+static void *cmem_dma_buf_kmap(struct dma_buf *dmabuf, unsigned long offset)
+{
+	struct pool_buffer *entry = dmabuf->priv;
+
+	if ( entry->kvirtp )
+		return entry->kvirtp + offset * PAGE_SIZE;
+	else
+		return NULL;
+}
+
+static void cmem_dma_buf_kunmap(struct dma_buf *dmabuf, unsigned long offset,
+			       void *ptr)
+{
+}
+
+static void cmem_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
+					enum dma_data_direction direction)
+{
+	struct pool_buffer *entry = dmabuf->priv;
+
+	if ( entry->kvirtp )
+		dmac_map_area(entry->kvirtp, entry->size, direction);
+	/* TODO: Need to take care of case where kvirtp is not set */
+
+	outer_clean_range(entry->physp, entry->physp + entry->size);
+}
+
+static int cmem_dmabuf_map_attach(struct dma_buf *dma_buf,
+			      struct device *target_dev,
+			      struct dma_buf_attachment *attach)
+{
+	struct cmem_dmabuf_attachment *cmem_dmabuf_attach;
+
+	cmem_dmabuf_attach = kzalloc(sizeof(*cmem_dmabuf_attach), GFP_KERNEL);
+	if (!cmem_dmabuf_attach) {
+		__E("cmem_dmabuf_map_attach:kzalloc failed\n");
+		return -ENOMEM;
+	}
+
+	cmem_dmabuf_attach->dir = DMA_NONE;
+	attach->priv = cmem_dmabuf_attach;
+
+	return 0;
+}
+
+static struct sg_table *cmem_map_dma_buf(struct dma_buf_attachment *attach,
+					 enum dma_data_direction dir)
+{
+	struct cmem_dmabuf_attachment *cmem_dmabuf_attach = attach->priv;
+	struct dma_buf *dmabuf = attach->dmabuf;
+	struct pool_buffer *entry = dmabuf->priv;
+	struct sg_table *sgt;
+	int ret;
+
+	if (WARN_ON(dir == DMA_NONE || !cmem_dmabuf_attach)) {
+		__E("cmem_map_dma_buf: Invalid dir or no attach\n");
+		return ERR_PTR(-EINVAL);
+	}
+
+	/* return the cached mapping when possible */
+	if (cmem_dmabuf_attach->dir == dir)
+		return cmem_dmabuf_attach->sgt;
+
+	sgt = kzalloc(sizeof(*sgt), GFP_KERNEL);
+
+	if (!sgt) {
+		__E("cmem_map_dma_buf: kzalloc failed\n");
+		return ERR_PTR(-ENOMEM);
+	}
+	ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
+	if (ret)
+		goto out;
+
+	sg_init_table(sgt->sgl, 1);
+	sg_dma_len(sgt->sgl) = entry->size;
+	sg_set_page(sgt->sgl, pfn_to_page(PFN_DOWN(entry->physp)), entry->size, 0);
+	sg_dma_address(sgt->sgl) = entry->physp;
+
+	/* dma sync buffer */
+	cmem_dma_buf_end_cpu_access(dmabuf, dir);
+	cmem_dmabuf_attach->sgt = sgt;
+	cmem_dmabuf_attach->dir = dir;
+
+	return cmem_dmabuf_attach->sgt;
+
+out:
+	kfree(sgt);
+	cmem_dmabuf_attach->sgt = NULL;
+	cmem_dmabuf_attach->dir = DMA_NONE;
+	return ERR_PTR(ret);
+}
+
+static void cmem_unmap_dma_buf(struct dma_buf_attachment *attach,
+			      struct sg_table *table,
+			      enum dma_data_direction direction)
+{
+	struct cmem_dmabuf_attachment *cmem_dmabuf_attach = attach->priv;
+
+	sg_free_table(cmem_dmabuf_attach->sgt);
+	kfree(cmem_dmabuf_attach->sgt);
+	cmem_dmabuf_attach->sgt = NULL;
+	cmem_dmabuf_attach->dir = DMA_NONE;
+}
+
+static int cmem_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
+					 enum dma_data_direction direction)
+{
+	struct pool_buffer *entry = dmabuf->priv;
+
+	outer_inv_range(entry->physp, entry->physp + entry->size);
+	if ( entry->kvirtp )
+		dmac_map_area(entry->kvirtp, entry->size, direction);
+
+	/* TODO: Need to take care of case where kvirtp is not set */
+
+	return 0;
+}
+
+static void cmem_dmabuf_map_detach(struct dma_buf *dma_buf,
+			       struct dma_buf_attachment *attach)
+{
+	struct  cmem_dmabuf_attachment * cmem_dmabuf_attach = attach->priv;
+	struct sg_table *sgt;
+
+	if (!cmem_dmabuf_attach)
+		return;
+
+	sgt = cmem_dmabuf_attach->sgt;
+	if (sgt) {
+		if (cmem_dmabuf_attach->dir != DMA_NONE)
+			dma_unmap_sg(attach->dev, sgt->sgl, sgt->nents,
+					cmem_dmabuf_attach->dir);
+		sg_free_table(sgt);
+	}
+
+	kfree(sgt);
+	kfree(cmem_dmabuf_attach);
+	attach->priv = NULL;
+}
+
+static const struct dma_buf_ops cmem_dmabuf_ops =  {
+	.attach = cmem_dmabuf_map_attach,
+	.detach = cmem_dmabuf_map_detach,
+	.map_dma_buf = cmem_map_dma_buf,
+	.unmap_dma_buf = cmem_unmap_dma_buf,
+	.mmap = cmem_dmabuf_mmap,
+	.release = cmem_dma_buf_release,
+	.begin_cpu_access = cmem_dma_buf_begin_cpu_access,
+	.end_cpu_access = cmem_dma_buf_end_cpu_access,
+	.kmap_atomic = cmem_dma_buf_kmap,
+	.kunmap_atomic = cmem_dma_buf_kunmap,
+	.kmap = cmem_dma_buf_kmap,
+	.kunmap = cmem_dma_buf_kunmap,
+};
+
+static void *map_virt_addr(phys_addr_t physp, unsigned long long size, struct vm_struct **vm)
+{
+	void *vaddr;
+
+	*vm = __get_vm_area(size, VM_IOREMAP, VMALLOC_START, VMALLOC_END);
+	if (!*vm) {
+		__E("__get_vm_area() failed\n");
+
+		return NULL;
+	}
+
+	vaddr = (*vm)->addr;
+	if(ioremap_page_range((unsigned long)vaddr, (unsigned long)vaddr + size,
+			      physp, PAGE_KERNEL)) {
+		__E("ioremap_page_range() failed\n");
+		free_vm_area(*vm);
+		*vm = NULL;
+		return NULL;
+	}
+
+	__D("map_virt_addr: ioremap_page_range(%#llx, %#llx)=0x%p\n",
+		(unsigned long long)physp, size, vaddr);
+
+	return vaddr;
+}
+#endif
+
+/**
+ * cmem_dmabuf_export - helper library implementation of the export callback
+ * @dev: cmem_device to export from
+ * @obj:  object to export
+ * @flags: 
+ *
+ * This is the implementation of the cmem_dmabuf_export functions for CMEM
+ */
+struct dma_buf *cmem_dmabuf_export(struct pool_buffer *entry, int flags)
+{
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+	DEFINE_DMA_BUF_EXPORT_INFO(exp_info);
+
+	if(entry->kvirtp == NULL) {
+		/* Map kernel virt memory */
+		entry->kvirtp = map_virt_addr(entry->physp, entry->size, &entry->vma);	
+		if ( entry->kvirtp == NULL ) {
+			__E("cmem_dmabuf_export:map_virt_addr failed\n");
+			return ERR_PTR(-EINVAL);
+		}
+	}
+
+	exp_info.ops = &cmem_dmabuf_ops;
+	exp_info.size = entry->size;
+	exp_info.flags = flags;
+	exp_info.priv = entry;
+
+	return dma_buf_export(&exp_info);
+#else
+	/* dmabuf export not supported */
+	return ERR_PTR(-EINVAL);
+#endif
+}
+EXPORT_SYMBOL(cmem_dmabuf_export);
 
 static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 {
@@ -1130,6 +1411,8 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
     struct CMEM_block_struct block;
     union CMEM_AllocUnion allocDesc;
     struct device *dev = NULL;
+    struct dma_buf *dmabuf;
+    int ret;
 
     if (_IOC_TYPE(cmd) != _IOC_TYPE(CMEM_IOCMAGIC)) {
 	__E("ioctl(): bad command type %#x (should be %#x)\n",
@@ -1446,7 +1729,10 @@ alloc:
 			                      entry->kvirtp, entry->dma);
 			}
 			else {
-			    HeapMem_free(bi, entry->physp, (size_t)entry->size);
+				HeapMem_free(bi, entry->physp, (size_t)entry->size);
+				if (entry->vma) {
+					free_vm_area(entry->vma);
+				}
 			}
 			list_del(e);
 			kfree(entry);
@@ -1828,6 +2114,60 @@ alloc:
 
 	    break;
 
+	case CMEM_IOCEXPORTDMABUF:
+	{
+		struct CMEM_dmabufDesc dmabuf_desc;
+
+		__D("EXPORTDMABUF ioctl received.\n");
+
+		if (copy_from_user(&dmabuf_desc, argp, sizeof(dmabuf_desc))) {
+			return -EFAULT;
+		}
+
+		/* Get the physical address */
+		physp = get_phys((void *)dmabuf_desc.virtp);
+
+		if (physp == ~(0LL)) {
+			__E("GETPHYS: Failed to convert virtual %p to physical.\n",
+			    (void *)dmabuf_desc.virtp);
+			return -EFAULT;
+		}
+
+		if (mutex_lock_interruptible(&cmem_mutex)) {
+			return -ERESTARTSYS;
+		}
+
+		/* Lookup physp in the busy entry list */
+		entry = find_busy_entry(physp, &pool, &e, &bi, NULL);
+
+		/* Export to dmabuf */
+		dmabuf = cmem_dmabuf_export(entry, O_RDWR);
+		if (IS_ERR(dmabuf)) {
+			/* normally the created dma-buf takes ownership of the ref,
+			 * but if that fails then drop the ref
+			 */
+			ret = PTR_ERR(dmabuf);
+			mutex_unlock(&cmem_mutex);
+			return -EFAULT;
+		}
+
+		/* Get the fd for dmabuf */
+		ret = dma_buf_fd(dmabuf, O_CLOEXEC);
+		if (ret < 0) {
+			dma_buf_put(dmabuf);
+			return -EFAULT;
+		}
+
+		/* return the dmafd */
+		dmabuf_desc.fd_dmabuf = ret;
+		if (copy_to_user(argp, &dmabuf_desc, sizeof(dmabuf_desc))) {
+			 mutex_unlock(&cmem_mutex);
+			return -EFAULT;
+		}
+		mutex_unlock(&cmem_mutex);
+	}
+	break;
+
         default:
             __E("Unknown ioctl received.\n");
             return -EINVAL;
@@ -1859,30 +2199,7 @@ static int mmap(struct file *filp, struct vm_area_struct *vma)
     mutex_unlock(&cmem_mutex);
 
     if (entry != NULL) {
-	if (size > entry->size) {
-	    __E("mmap: requested size %#llx too big (should be <= %#llx)\n",
-	        (unsigned long long)size, (unsigned long long)entry->size);
-
-	    return -EINVAL;
-	}
-
-	if (entry->flags & CMEM_CACHED) {
-	    vma->vm_page_prot = __pgprot(pgprot_val(vma->vm_page_prot) |
-                               (L_PTE_MT_WRITEALLOC | L_PTE_MT_BUFFERABLE));
-	}
-	else {
-	    vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-	}
-	vma->vm_flags |= VM_RESERVED | VM_IO;
-
-	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff, size,
-	                    vma->vm_page_prot)) {
-	    __E("mmap: failed remap_pfn_range\n");
-
-	    return -EAGAIN;
-	}
-
-	return 0;
+	return mmap_buffer(entry, vma, size);
     }
     else {
 	__E("mmap: can't find allocated buffer with physp %#llx\n",
