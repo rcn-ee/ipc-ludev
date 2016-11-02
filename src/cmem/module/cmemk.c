@@ -2327,10 +2327,11 @@ int __init cmem_init(void)
     /* Create cmem device */
     cmem_cma_dev_0 = device_create(cmem_class, NULL, MKDEV(cmem_major, 0),
 				   NULL, "cmem");
-#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
-	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
     cmem_cma_dev_0->coherent_dma_mask = DMA_BIT_MASK(32);
+#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
     cmem_cma_dev_0->dma_pfn_offset = KEYSTONE_DMA_PFN_OFFSET;
+#endif
 #endif
     for (bi = 0; bi < NBLOCKS; bi++) {
 	if (!block_start[bi] || !block_end[bi]) {
