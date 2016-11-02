@@ -55,6 +55,7 @@
 #define TRUE	1
 
 unsigned int *ptrs[NUMHEAPPTRS];
+unsigned int dmabuffds[NUMHEAPPTRS];
 int nblocks;
 unsigned int non_interactive_flag;
 
@@ -282,15 +283,26 @@ void testPools(size_t size, int block)
     for (i = 0; i < num_buffers; i++) {
 	ptrs[i] = CMEM_alloc2(block, size, &params);
 	if (ptrs[i] == NULL) {
-	    printf("error re-allocating %d heap blocks\n", num_buffers);
+	    printf("error re-allocating %d heap block\n", i);
 	    break;
 	}
     }
+
+    /* export buffers as dma_buf */
+    printf("exporting %d pool blocks...\n", num_buffers);
+    for (i = 0; i < num_buffers; i++) {
+	dmabuffds[i] = CMEM_export_dmabuf(ptrs[i]);
+	if (dmabuffds[i] < 0) {
+	    printf("error exporting %d heap block\n", i);
+	    break;
+	}
+    }
+
     printf("...done, freeing pool blocks...\n");
     for (i = 0; i < num_buffers; i++) {
 	rv = CMEM_free(ptrs[i], &params);
 	if (rv < 0) {
-	    printf("error freeing blocks\n");
+	    printf("error freeing block %d\n", i);
 	    break;
 	}
     }
