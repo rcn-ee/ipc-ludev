@@ -344,8 +344,13 @@ static int map_header(void **vaddrp, phys_addr_t physp, struct vm_struct **vm)
     }
 
     vaddr = (unsigned long)(*vm)->addr;
-    ioremap_page_range((unsigned long)vaddr, (unsigned long)vaddr + PAGE_SIZE,
-                       physp, PAGE_KERNEL);
+    if(ioremap_page_range((unsigned long)vaddr, (unsigned long)vaddr + PAGE_SIZE,
+                       physp, PAGE_KERNEL)) {
+        __E("ioremap_page_range() failed\n");
+        free_vm_area(*vm);
+        *vm = NULL;
+        return -ENOMEM;
+    }
     *vaddrp = (*vm)->addr;
 
     __D("map_header: ioremap_page_range(%#llx, %#lx)=0x%p\n",
@@ -1074,6 +1079,7 @@ static int alloc_pool(int bi, int idx, int num, unsigned long long reqsize, phys
         entry->id = i;
         entry->physp = physp;
         entry->size = size;
+        entry->kvirtp = NULL;
         INIT_LIST_HEAD(&entry->users);
 
         if (physpRet) {
@@ -1205,7 +1211,7 @@ alloc:
 	    }
 	    else {
 		physp = HeapMem_alloc(bi, size, align, ALLOCRUN);
-
+		entry->kvirtp = NULL;
 		/* set only for test just below here */
 		virtp = (void *)(unsigned int)physp;
 	    }
