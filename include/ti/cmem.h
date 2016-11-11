@@ -382,6 +382,11 @@ typedef struct CMEM_AllocParams {
                          */
 } CMEM_AllocParams;
 
+struct CMEM_block_struct {
+    void *addr;
+    size_t size;
+};
+
 extern CMEM_AllocParams CMEM_DEFAULTPARAMS;
 
 typedef struct CMEM_BlockAttrs {

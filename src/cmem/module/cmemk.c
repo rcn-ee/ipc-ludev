@@ -1099,10 +1099,6 @@ static int alloc_pool(int bi, int idx, int num, unsigned long long reqsize, phys
     return 0;
 }
 
-struct block_struct {
-    void *addr;
-    size_t size;
-};
 
 static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 {
@@ -1131,7 +1127,7 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
     int bi;
     int id;
     int pool_alloc;
-    struct block_struct block;
+    struct CMEM_block_struct block;
     union CMEM_AllocUnion allocDesc;
     struct device *dev = NULL;
 

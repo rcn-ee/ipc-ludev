@@ -58,11 +58,6 @@ CMEM_AllocParams CMEM_DEFAULTPARAMS = {
 
 #define __E(fmt, args...) fprintf(stderr, "CMEM Error: " fmt, ## args)
 
-struct block_struct {
-    void *addr;
-    size_t size;
-};
-
 /* set cmem_fd to -2 to distinguish from failed open (-1) */
 static int cmem_fd = -2;
 static int ref_count = 0;
@@ -858,7 +853,7 @@ int CMEM_cacheWbInvAll(void)
 
 int CMEM_cacheWb(void *ptr, size_t size)
 {
-    struct block_struct block;
+    struct CMEM_block_struct block;
 
     __D("cacheWb: entered w/ addr %p, size %#x\n", ptr, size);
 
@@ -881,7 +876,7 @@ int CMEM_cacheWb(void *ptr, size_t size)
 
 int CMEM_cacheWbInv(void *ptr, size_t size)
 {
-    struct block_struct block;
+    struct CMEM_block_struct block;
 
     __D("cacheWbInv: entered w/ addr %p, size %#x\n", ptr, size);
 
@@ -905,7 +900,7 @@ int CMEM_cacheWbInv(void *ptr, size_t size)
 
 int CMEM_cacheInv(void *ptr, size_t size)
 {
-    struct block_struct block;
+    struct CMEM_block_struct block;
 
     __D("cacheInv: entered w/ addr %p, size %#x\n", ptr, size);
 
