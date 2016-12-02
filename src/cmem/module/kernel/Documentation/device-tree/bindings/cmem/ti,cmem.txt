@@ -1,10 +1,11 @@
 CMEM module
 
 This file provides information about, what the device tree entry for the
-cmem kernel module device should contain.  The entries specify the memory
-region for cmem blocks and pools allocated in each region.
+cmem kernel module device should contain.  The subnodes has entries that 
+specify the memory region for cmem blocks and pools allocated in each region. 
 
-Required properties:
+
+Required properties in the main cmem node:
 - compatible : "ti,cmem"
 - #address-cells: Specifies the number of cells used to represent
 	the reg address entry. Set to 1. Must be present if the device has
@@ -12,37 +13,29 @@ Required properties:
 - #size-cells: Specifies the number of cells used to represent
 	the reg size entry. Set to 0. Must be present if the device has
 	sub-nodes
+
+Optional properties in the main cmem node 
 - #pool-size-cells: Specifies the number of cells used to represent
-	the size of pool
+	the size of pool ( Will assume pool size cells to 1 if not defined)
+
+Block subnodes:
+---------------
+Each cmem node specifies multiple subnodes to specify Blocks of memory used.
+Required properties in the block subnodes:
 - reg: region/block number
-- memory-region: Point to reserved memory block node, with standard 
+- memory-region: Point to reserved memory block node, with standard
 	reserved-memory properties
+  or
+  sram: Point to sram node with standard sram properties.
+  ( One of the above should be present )
+
+Optional properties in the block subnodes
 - cmem-buf-pools: Specify the number of pools and sizes each pools
 	<num_pools size1 size2...>
 
-Optional properties:
-
 Example:
 
-        reserved-memory {
-                #address-cells = <2>;
-                #size-cells = <2>;
-                ranges;
-
-                cmem_block_mem_0: cmem_block_mem@a0000000 {
-                        reg = <0x0 0xa0000000 0x0 0x0c000000>;
-                        no-map;
-                        status = "okay";
-                };
-
-		cmem_block_mem_1_ocmc3: cmem_block_mem@40500000 {
-			reg = <0x0 0x40500000 0x0 0x100000>;
-			no-map;
-			status = "okay";
-		};
-        };
-
-        cmem {
+         cmem {
                 compatible = "ti,cmem";
                 #address-cells = <1>;
                 #size-cells = <0>;
@@ -61,4 +54,33 @@ Example:
 			reg = <1>;
 			memory-region = <&cmem_block_mem_1_ocmc3>;
 		};
+
+		cmem_block_2: cmem_block@2 {
+			reg = <2>;
+			sram = <&sram_cmem>;
+		};
         };
+       reserved-memory {
+                #address-cells = <2>;
+                #size-cells = <2>;
+                ranges;
+
+                cmem_block_mem_0: cmem_block_mem@a0000000 {
+                        reg = <0x0 0xa0000000 0x0 0x0c000000>;
+                        no-map;
+                        status = "okay";
+                };
+
+		cmem_block_mem_1_ocmc3: cmem_block_mem@40500000 {
+			reg = <0x0 0x40500000 0x0 0x100000>;
+			no-map;
+			status = "okay";
+		};
+
+	};
+
+
+	&msm_ram {
+		sram_cmem: sram-cmem@100000 {
+		reg = <0x100000 0x480000>;
+	};
