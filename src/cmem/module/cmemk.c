@@ -45,7 +45,9 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/of_platform.h>
+#include <linux/of_address.h>
 #include <linux/dma-buf.h>
+
 /*
  * USE_MMAPSEM means acquire/release current->mm->mmap_sem around calls
  * to dma_[flush/clean/inv]_range.
@@ -86,12 +88,17 @@
 #define VM_RESERVED 0x00080000
 #endif
 
+/* Define types of blocks */
+#define BLOCK_TYPE_RESV_MEMORY_NODE 0
+#define BLOCK_TYPE_SRAM_NODE   1
+
 static struct vm_struct *ioremap_area;
 static unsigned int nblocks = 0;
 static unsigned int block_flags[NBLOCKS] = {0, 0, 0, 0};
 static unsigned long long block_start[NBLOCKS] = {0, 0, 0, 0};
 static unsigned long long block_end[NBLOCKS] = {0, 0, 0, 0};
 static unsigned long long block_avail_size[NBLOCKS] = {0, 0, 0, 0};
+static int block_type[NBLOCKS] = {0, 0, 0 , 0}; 
 static unsigned int total_num_buffers[NBLOCKS] = {0, 0, 0, 0};
 static int pool_num_buffers[NBLOCKS][MAX_POOLS];
 static unsigned long long pool_size[NBLOCKS][MAX_POOLS];
@@ -2350,121 +2357,133 @@ static void banner(void)
  */
 int dt_config(void)
 {
-    struct device_node *np, *block, *mem;
-    int ret;
-    u32 tmp[MAX_POOLS * 3];
-    unsigned long long addr;
-    unsigned long long size;
-    int n, p;
-    int i;
-    int num_pools;
-    int addr_cells;
-    int size_cells;
-    u32 num_buffers;
-    u32 pool_size_cells;
-    int ints_per_pool;
-    unsigned long long buffer_size;
-    int block_num;
+	struct device_node *np, *block, *mem;
+	int ret;
+	u32 tmp[MAX_POOLS * 3];
+	unsigned long long addr;
+	unsigned long long size;
+	int n, p;
+	int i;
+	int num_pools;
+	u32 num_buffers;
+	u32 pool_size_cells;
+	int ints_per_pool;
+	unsigned long long buffer_size;
+	int block_num;
+	struct resource temp_res;
 
-    np = of_find_compatible_node(NULL, NULL, "ti,cmem");
-    if (!np) {
-        __D("no cmem node found in device tree\n");
-	return -ENODEV;
-    }
-
-    __D("found cmem node in device tree, getting child nodes\n");
-
-    if (of_get_available_child_count(np) == 0) {
-	__E("no child block node(s) found\n");
-	return -EINVAL;
-    }
-
-    pool_size_cells = 1;
-    if (of_get_property(np, "#pool-size-cells", NULL) != NULL) {
-	of_property_read_u32(np, "#pool-size-cells", &pool_size_cells);
-    }
-    ints_per_pool = pool_size_cells + 1;
-
-    block = NULL;
-
-    while ((block = of_get_next_available_child(np, block)) != NULL) {
-	__D("got child\n");
-
-	if (of_property_read_u32(block, "reg", &block_num)) {
-	    __E("cmem block has no reg property\n");
-	    return -EINVAL;
-	}
-	if (block_num < 0 || block_num >= NBLOCKS) {
-	    __E("cmem block 'address' (reg property) %d out of range\n"
-	        "  must be 0 -> %d\n", block_num, NBLOCKS - 1);
-	    return -EINVAL;
-	}
-	if (block_start[block_num] != 0) {
-	    __E("cmem block %d already assigned\n", block_num);
-	    return -EINVAL;
+	np = of_find_compatible_node(NULL, NULL, "ti,cmem");
+	if (!np) {
+		__D("no cmem node found in device tree\n");
+		return -ENODEV;
 	}
 
-	__D("  looking for memory-region phandle\n");
+	__D("found cmem node in device tree, getting child nodes\n");
 
-	mem = of_parse_phandle(block, "memory-region", 0);
-	if (mem) {
-	    __D("got memory-region\n");
+	if (of_get_available_child_count(np) == 0) {
+		__E("no child block node(s) found\n");
+		return -EINVAL;
+	}
 
-	    addr_cells = of_n_addr_cells(mem);
-	    size_cells = of_n_size_cells(mem);
+	pool_size_cells = 1;
+	if (of_get_property(np, "#pool-size-cells", NULL) != NULL) {
+		of_property_read_u32(np, "#pool-size-cells", &pool_size_cells);
+	}
+	ints_per_pool = pool_size_cells + 1;
 
-	    ret = of_property_read_u32_array(mem, "reg", tmp,
-	                                     addr_cells + size_cells);
-	    if (ret) {
-		return ret;
-	    }
+	block = NULL;
 
-	    addr = 0;
-	    for (i = 0; i < addr_cells; i++) {
-		addr <<= 32;
-		addr |= tmp[i];
-	    }
-	    size = 0;
-	    for (i = 0; i < size_cells; i++) {
-		size <<= 32;
-		size |= tmp[addr_cells + i];
-	    }
+	while ((block = of_get_next_available_child(np, block)) != NULL) {
+		__D("got child\n");
 
-	    block_start[block_num] = addr;
-	    block_end[block_num] = addr + size;
-
-	    __D("got addr size: %#llx %#llx\n", addr, size);
-
-	    num_pools = 0;
-	    if (of_get_property(block, "cmem-buf-pools", &n) != NULL) {
-		/*
-		 * n is number of bytes, need multiple of (ints_per_pool * 4)
-		 */
-		if ((n % (ints_per_pool * 4)) != 0) {
-			__E("bad cmem-buf-pools: must be multiple of %d ints\n",
-			    ints_per_pool);
+		if (of_property_read_u32(block, "reg", &block_num)) {
+			__E("cmem block has no reg property\n");
+			return -EINVAL;
+		}
+		if (block_num < 0 || block_num >= NBLOCKS) {
+			__E("cmem block 'address' (reg property) %d out of range\n"
+			    "  must be 0 -> %d\n", block_num, NBLOCKS - 1);
+			return -EINVAL;
+		}
+		if (block_start[block_num] != 0) {
+			__E("cmem block %d already assigned\n", block_num);
 			return -EINVAL;
 		}
 
-                num_pools = n / (ints_per_pool * 4);
-	    }
+		/* Set default type to reserved memory node */
+		block_type[block_num] = BLOCK_TYPE_RESV_MEMORY_NODE;
 
-            if (num_pools > MAX_POOLS) {
-		__E("bad cmem-buf-pools: too many pools\n"
-		    "  must be <= %d\n", MAX_POOLS);
-		return -EINVAL;
-	    }
+		__D("  looking for memory-region phandle\n");
 
-	    __D("num_pools=%d\n", num_pools);
+		mem = of_parse_phandle(block, "memory-region", 0);
+		if (!mem) {
+			/* Look for sram phandle */
+			mem = of_parse_phandle(block, "sram", 0);
+			if (!mem) {
+				__E("no memory-region phandle\n");
+				return -EINVAL;
+			}
+			block_type[block_num] = BLOCK_TYPE_SRAM_NODE;
+		}
 
-	    npools[block_num] = num_pools;
-	    if (num_pools) {
-		ret = of_property_read_u32_array(block, "cmem-buf-pools", tmp,
-		                                 ints_per_pool * num_pools);
-		if (!ret) {
-		    n = 0;
-		    p = 0;
-		    while (num_pools) {
+		__D("got memory-region\n");
+
+		if (!of_device_is_available(mem)) {
+			__E("Error sub device node not available\n");
+			return -EINVAL;
+		}
+
+		__D("got device for memory: block type %d\n",
+		    block_type[block_num]);
+
+		ret = of_address_to_resource(mem, 0, &temp_res);
+		if (ret) {
+			__E("Could not get resource %d\n", ret);
+			return -EINVAL;
+		}
+
+		addr = temp_res.start;
+		size = resource_size(&temp_res);
+
+		block_start[block_num] = addr;
+		block_end[block_num] = addr + size;
+
+		__D("got addr size: %#llx %#llx\n", addr, size);
+
+		num_pools = 0;
+		if (of_get_property(block, "cmem-buf-pools", &n) != NULL) {
+			/*
+			 * n is number of bytes, need multiple of (ints_per_pool * 4)
+			 */
+			if ((n % (ints_per_pool * 4)) != 0) {
+				__E("bad cmem-buf-pools: must be multiple of %d ints\n",
+				    ints_per_pool);
+				return -EINVAL;
+			}
+
+			num_pools = n / (ints_per_pool * 4);
+		}
+
+		if (num_pools > MAX_POOLS) {
+			__E("bad cmem-buf-pools: too many pools\n"
+			"  must be <= %d\n", MAX_POOLS);
+				return -EINVAL;
+		}
+
+		__D("num_pools=%d\n", num_pools);
+
+		npools[block_num] = num_pools;
+		if (!num_pools)
+			continue;
+		ret = of_property_read_u32_array(block, "cmem-buf-pools",
+						 tmp,
+						 ints_per_pool * num_pools);
+		if (ret)
+			continue;
+
+		n = 0;
+		p = 0;
+		while (num_pools) {
 			num_buffers = tmp[n];
 
 			buffer_size = 0;
@@ -2481,17 +2500,10 @@ int dt_config(void)
 
 			__D("got a pool: %d x %#llx\n",
 			    num_buffers, buffer_size);
-		    }
 		}
-	    }
 	}
-	else {
-	    __E("no memory-region phandle\n");
-	    return -EINVAL;
-	}
-    }
 
-    return 0;
+	return 0;
 }
 
 #endif /* KERNEL_VERSION >= 3.14.0 */
@@ -2691,18 +2703,19 @@ int __init cmem_init(void)
 
 	block_avail_size[bi] = length;
 
-	__D("calling request_mem_region(%#llx, %#llx, \"CMEM\")\n",
-	    block_start[bi], length);
+	if (block_type[bi] != BLOCK_TYPE_SRAM_NODE) {
+		__D("calling request_mem_region(%#llx, %#llx, \"CMEM\")\n",
+		    block_start[bi], length);
 
-	if (!request_mem_region(block_start[bi], length, "CMEM")) {
-	    __E("Failed to request_mem_region(%#llx, %#llx)\n",
-	        block_start[bi], length);
-	    err = -EFAULT;
-	    goto fail_after_create;
+		if (!request_mem_region(block_start[bi], length, "CMEM")) {
+			__E("Failed to request_mem_region(%#llx, %#llx)\n",
+			    block_start[bi], length);
+			err = -EFAULT;
+			goto fail_after_create;
+		}
 	}
-	else {
-	    block_flags[bi] |= BLOCK_MEMREGION;
-	}
+
+	block_flags[bi] |= BLOCK_MEMREGION;
 
 	/* Allocate the pools */
 	for (i = 0; i < npools[bi]; i++) {
@@ -2818,7 +2831,8 @@ fail_after_create:
 	    __D("calling release_mem_region(%#llx, %#llx)...\n",
 	        block_start[bi], length);
 
-	    release_mem_region(block_start[bi], length);
+	    if (block_type[bi] != BLOCK_TYPE_SRAM_NODE)
+		release_mem_region(block_start[bi], length);
 
 	    block_flags[bi] &= ~BLOCK_MEMREGION;
 	}
@@ -2930,9 +2944,10 @@ void __exit cmem_exit(void)
 	    __D("calling release_mem_region(%#llx, %#llx)...\n",
 	        block_start[bi], length);
 
-	    release_mem_region(block_start[bi], length);
+	    if (block_type[bi] != BLOCK_TYPE_SRAM_NODE)
+		release_mem_region(block_start[bi], length);
 
-	    block_flags[bi] &= ~BLOCK_MEMREGION;
+		block_flags[bi] &= ~BLOCK_MEMREGION;
 	}
     }
 
