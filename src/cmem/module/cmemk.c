@@ -1093,6 +1093,7 @@ static int alloc_pool(int bi, int idx, int num, unsigned long long reqsize, phys
         entry->physp = physp;
         entry->size = size;
         entry->kvirtp = NULL;
+        entry->vma = NULL;
         INIT_LIST_HEAD(&entry->users);
 
         if (physpRet) {
@@ -1517,6 +1518,7 @@ alloc:
 	    entry->physp = physp;
 	    entry->size = size;
 	    entry->flags = cmd & ~CMEM_IOCCMDMASK;
+	    entry->vma = NULL;
 	    INIT_LIST_HEAD(&entry->users);
 
             busylistp = &p_objs[bi][pool].busylist;
