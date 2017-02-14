@@ -1187,8 +1187,14 @@ static void cmem_dma_buf_kunmap(struct dma_buf *dmabuf, unsigned long offset,
 {
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0))
+static int cmem_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
+				       enum dma_data_direction direction)
+#else
 static void cmem_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 					enum dma_data_direction direction)
+
+#endif
 {
 	struct pool_buffer *entry = dmabuf->priv;
 
@@ -1197,6 +1203,10 @@ static void cmem_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 	/* TODO: Need to take care of case where kvirtp is not set */
 
 	outer_clean_range(entry->physp, entry->physp + entry->size);
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0))
+	return 0;
+#endif
 }
 
 static int cmem_dmabuf_map_attach(struct dma_buf *dma_buf,
