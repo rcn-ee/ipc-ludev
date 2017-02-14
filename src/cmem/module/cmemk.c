@@ -650,8 +650,16 @@ static phys_addr_t get_phys(void *virtp)
         struct page *pages;
 
         down_read(&current->mm->mmap_sem);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
+        res = get_user_pages_remote(current, current->mm, virt, nr_pages,
+                                    FOLL_WRITE, &pages, NULL);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0))
+        res = get_user_pages_remote(current, current->mm, virt, nr_pages,
+                                    1, 0, &pages, NULL);
+#else
         res = get_user_pages(current, current->mm, virt, nr_pages, 1, 0,
                              &pages, NULL);
+#endif
         up_read(&current->mm->mmap_sem);
 
         if (res == nr_pages) {
