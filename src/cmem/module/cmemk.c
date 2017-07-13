@@ -1342,10 +1342,17 @@ static const struct dma_buf_ops cmem_dmabuf_ops =  {
 	.release = cmem_dma_buf_release,
 	.begin_cpu_access = cmem_dma_buf_begin_cpu_access,
 	.end_cpu_access = cmem_dma_buf_end_cpu_access,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0))
 	.kmap_atomic = cmem_dma_buf_kmap,
 	.kunmap_atomic = cmem_dma_buf_kunmap,
 	.kmap = cmem_dma_buf_kmap,
 	.kunmap = cmem_dma_buf_kunmap,
+#else
+	.map_atomic = cmem_dma_buf_kmap,
+	.unmap_atomic = cmem_dma_buf_kunmap,
+	.map = cmem_dma_buf_kmap,
+	.unmap = cmem_dma_buf_kunmap,
+#endif
 };
 
 static void *map_virt_addr(phys_addr_t physp, unsigned long long size, struct vm_struct **vm)
