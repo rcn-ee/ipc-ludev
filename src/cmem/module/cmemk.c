@@ -33,8 +33,8 @@
 #include <linux/vmalloc.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/uaccess.h>
 #include <asm/cacheflush.h>
-#include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
 
