@@ -415,6 +415,7 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
     size_t curSize, adjSize;
     size_t remainSize;  /* free memory after allocated memory */
     size_t adjAlign, offset;
+    int ret_value;
 
     adjSize = reqSize;
 
@@ -442,7 +443,10 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
 
     /* Loop over the free list. */
     while (curHeaderPhys != 0) {
-	map_header((void **)&curHeader, curHeaderPhys, &curHeader_vm_area);
+        ret_value = map_header((void **)&curHeader, curHeaderPhys, &curHeader_vm_area);
+        if (ret_value < 0) {
+            return 0;
+        }
         curSize = curHeader->size;
 
         /*
@@ -471,8 +475,10 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
 
 	    if (remainSize) {
 		newHeaderPhys = allocAddr + adjSize;
-		map_header((void **)&newHeader, newHeaderPhys,
-		           &newHeader_vm_area);
+				ret_value = map_header((void **)&newHeader, newHeaderPhys,
+						       &newHeader_vm_area);
+				if (ret_value < 0)
+					return 0;
 
 		newHeader->next = curHeader->next;
 		newHeader->size = remainSize;
@@ -510,8 +516,10 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
                  *        it is safe.
                  */
 		if (prevHeaderPhys != 0) {
-		    map_header((void **)&prevHeader, prevHeaderPhys,
-		               &prevHeader_vm_area);
+					ret_value = map_header((void **)&prevHeader, prevHeaderPhys,
+								   &prevHeader_vm_area);
+					if (ret_value < 0)
+						return 0;
 		}
 		else {
 		    prevHeader = &heap_head[bi];
@@ -560,6 +568,7 @@ void HeapMem_free(int bi, phys_addr_t block, size_t size)
     phys_addr_t newHeaderPhys;
     phys_addr_t nextHeaderPhys;
     size_t offset;
+    int ret_value;
 
     /* Restore size to actual allocated size */
     if ((offset = size & (HEAP_ALIGN - 1)) != 0) {
@@ -571,7 +580,9 @@ void HeapMem_free(int bi, phys_addr_t block, size_t size)
 
     /* Go down freelist and find right place for buf */
     while (nextHeaderPhys != 0 && nextHeaderPhys < newHeaderPhys) {
-	map_header((void **)&nextHeader, nextHeaderPhys, &nextHeader_vm_area);
+		ret_value = map_header((void **)&nextHeader, nextHeaderPhys, &nextHeader_vm_area);
+		if (ret_value < 0)
+			return;
 
         curHeaderPhys = nextHeaderPhys;
         nextHeaderPhys = nextHeader->next;
@@ -579,10 +590,14 @@ void HeapMem_free(int bi, phys_addr_t block, size_t size)
 	unmap_header(nextHeader, nextHeader_vm_area);
     }
 
-    map_header((void **)&newHeader, newHeaderPhys, &newHeader_vm_area);
+	ret_value = map_header((void **)&newHeader, newHeaderPhys, &newHeader_vm_area);
+	if (ret_value < 0)
+		return;
 
     if (curHeaderPhys != 0) {
-	map_header((void **)&curHeader, curHeaderPhys, &curHeader_vm_area);
+		ret_value = map_header((void **)&curHeader, curHeaderPhys, &curHeader_vm_area);
+		if (ret_value < 0)
+			return;
     }
     else {
 	curHeader = &heap_head[bi];
@@ -595,8 +610,9 @@ void HeapMem_free(int bi, phys_addr_t block, size_t size)
     /* Join contiguous free blocks */
     /* Join with upper block */
     if (nextHeaderPhys != 0 && (newHeaderPhys + size) == nextHeaderPhys) {
-	map_header((void **)&nextHeader, nextHeaderPhys, &nextHeader_vm_area);
-
+		ret_value = map_header((void **)&nextHeader, nextHeaderPhys, &nextHeader_vm_area);
+		if (ret_value < 0)
+			return;
         newHeader->next = nextHeader->next;
         newHeader->size += nextHeader->size;
 
@@ -729,18 +745,21 @@ return;
     for (e = busylistp->next; e != busylistp; e = e->next) {
 
         entry = list_entry(e, struct pool_buffer, element);
+        if ( entry != NULL )
+            __D("Busy: Buffer with id %d and physical address %#llx\n",
+                entry->id, (unsigned long long)entry->physp);
+        }
 
-        __D("Busy: Buffer with id %d and physical address %#llx\n",
-            entry->id, (unsigned long long)entry->physp);
-    }
+        if (bi < NBLOCKS) {
 
-    __D("Freelist for pool %d:\n", idx);
-    for (e = freelistp->next; e != freelistp; e = e->next) {
+        __D("Freelist for pool %d:\n", idx);
+        for (e = freelistp->next; e != freelistp; e = e->next) {
 
         entry = list_entry(e, struct pool_buffer, element);
-
-        __D("Free: Buffer with id %d and physical address %#llx\n",
-            entry->id, (unsigned long long)entry->physp);
+        if ( entry != NULL )
+            __D("Free: Buffer with id %d and physical address %#llx\n",
+                entry->id, (unsigned long long)entry->physp);
+        }
     }
 
     mutex_unlock(&cmem_mutex);
@@ -1565,7 +1584,6 @@ alloc:
 		allocDesc.alloc_pool_outparams.size = size;
 
 		if (copy_to_user(argp, &allocDesc, sizeof(allocDesc))) {
-		    mutex_unlock(&cmem_mutex);
 		    return -EFAULT;
 		}
 	    }
@@ -2179,6 +2197,13 @@ alloc:
 		/* Lookup physp in the busy entry list */
 		entry = find_busy_entry(physp, &pool, &e, &bi, NULL);
 
+		if (entry == NULL) {
+			__E(" Failed to find entry virtp: %p physp: %#llx \n",
+			    (void *)dmabuf_desc.virtp, (unsigned long long)physp);
+			mutex_unlock(&cmem_mutex);
+			return -EFAULT;
+		}
+
 		/* Export to dmabuf */
 		dmabuf = cmem_dmabuf_export(entry, O_RDWR);
 		if (IS_ERR(dmabuf)) {
@@ -2194,6 +2219,7 @@ alloc:
 		ret = dma_buf_fd(dmabuf, O_CLOEXEC);
 		if (ret < 0) {
 			dma_buf_put(dmabuf);
+			mutex_unlock(&cmem_mutex);
 			return -EFAULT;
 		}
 
@@ -2775,7 +2801,13 @@ int __init cmem_init(void)
 	    heap_head[bi].next = heap_physp[bi];
 	    heap_head[bi].size = heap_size[bi];
 
-	    map_header((void **)&virtp, heap_physp[bi], &ioremap_area);
+		err = map_header((void **)&virtp, heap_physp[bi], &ioremap_area);
+		if (err < 0) {
+			__E("Failed to alloc pool of size 0x%llu and number of buffers %d\n", pool_size[bi][i], pool_num_buffers[bi][i]);
+			err = -ENOMEM;
+
+			goto fail_after_create;
+		}
 
 	    header = (HeapMem_Header *)virtp;
 	    header->next = 0;
