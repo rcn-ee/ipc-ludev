@@ -774,14 +774,14 @@ int CMEM_export_dmabuf(void *ptr)
     __D("export_dmabuf: entered w/ addr %p\n", ptr);
 
     if (!validate_init()) {
-	return 0;
+        return -1;
     }
 
     dmabuf_desc.virtp = ptr;
     if (ioctl(cmem_fd, CMEM_IOCEXPORTDMABUF | CMEM_IOCMAGIC, &dmabuf_desc) == -1) {
         __E("export_dmabuf: Failed to export to dmabuf %#x\n",
             (unsigned int)ptr);
-        return 0;
+        return -1;
     }
 
     __D("export_dmabuf: exiting, ioctl CMEM_IOCEXPORTDMABUF succeeded, returning %d\n",
