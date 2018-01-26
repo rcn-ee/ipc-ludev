@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2007-2014 Texas Instruments Incorporated - http://www.ti.com
+ *  Copyright (C) 2007-2018 Texas Instruments Incorporated - http://www.ti.com
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -633,9 +633,11 @@ static phys_addr_t get_phys(void *virtp)
 	__D("get_phys: virt_to_phys translated direct-mapped %#lx to %#llx\n",
 	    virt, (unsigned long long)physp);
     }
-
+    down_read(&current->mm->mmap_sem);
+    vma = find_vma(mm, virt);
+    up_read(&current->mm->mmap_sem);
     /* this will catch, kernel-allocated, mmaped-to-usermode addresses */
-    else if ((vma = find_vma(mm, virt)) &&
+    if (vma  &&
              (vma->vm_flags & VM_IO) &&
              (vma->vm_pgoff)) {
         physp = ((unsigned long long)vma->vm_pgoff << PAGE_SHIFT) +
