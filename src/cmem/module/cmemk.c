@@ -121,11 +121,11 @@ module_param(phys_end, charp, S_IRUGO);
 static int npools[NBLOCKS + 1] = {0, 0, 0, 0, 0};
 
 static char *pools[MAX_POOLS] = {
-    NULL
+	NULL
 };
 MODULE_PARM_DESC(pools,
-    "\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
-    "\n\t\t decimal sizes");
+	"\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
+	"\n\t\t decimal sizes");
 module_param_array(pools, charp, &npools[0], S_IRUGO);
 
 /* begin block 1 */
@@ -137,11 +137,11 @@ module_param(phys_start_1, charp, S_IRUGO);
 module_param(phys_end_1, charp, S_IRUGO);
 
 static char *pools_1[MAX_POOLS] = {
-    NULL
+	NULL
 };
 MODULE_PARM_DESC(pools_1,
-    "\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
-    "\n\t\t decimal sizes, for Extended CMEM Pool");
+	"\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
+	"\n\t\t decimal sizes, for Extended CMEM Pool");
 module_param_array(pools_1, charp, &npools[1], S_IRUGO);
 /* end block 1 */
 
@@ -154,11 +154,11 @@ module_param(phys_start_2, charp, S_IRUGO);
 module_param(phys_end_2, charp, S_IRUGO);
 
 static char *pools_2[MAX_POOLS] = {
-    NULL
+	NULL
 };
 MODULE_PARM_DESC(pools_2,
-    "\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
-    "\n\t\t decimal sizes, for Extended CMEM Pool");
+	"\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
+	"\n\t\t decimal sizes, for Extended CMEM Pool");
 module_param_array(pools_2, charp, &npools[2], S_IRUGO);
 /* end block 2 */
 
@@ -172,47 +172,47 @@ module_param(phys_start_3, charp, S_IRUGO);
 module_param(phys_end_3, charp, S_IRUGO);
 
 static char *pools_3[MAX_POOLS] = {
-    NULL
+	NULL
 };
 MODULE_PARM_DESC(pools_3,
-    "\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
-    "\n\t\t decimal sizes, for Extended CMEM Pool");
+	"\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
+	"\n\t\t decimal sizes, for Extended CMEM Pool");
 module_param_array(pools_3, charp, &npools[3], S_IRUGO);
 /* end block 3 */
 /* cut-and-paste above as part of adding support for more than 4 blocks */
 
 static int allowOverlap = -1;
 MODULE_PARM_DESC(allowOverlap,
-    "\n\t\t DEPRECATED - ignored if found"
-    "\n\t\t Set to 1 if cmem range is allowed to overlap memory range"
-    "\n\t\t allocated to kernel physical mem (via mem=xxx)");
+		 "\n\t\t DEPRECATED - ignored if found"
+		 "\n\t\t Set to 1 if cmem range is allowed to overlap memory range"
+		 "\n\t\t allocated to kernel physical mem (via mem=xxx)");
 module_param(allowOverlap, int, S_IRUGO);
 
 static int useHeapIfPoolUnavailable = 0;
 MODULE_PARM_DESC(useHeapIfPoolUnavailable,
-    "\n\t\t Set to 1 if you want a pool-based allocation request to"
-    "\n\t\t fall back to a heap-based allocation attempt");
+		 "\n\t\t Set to 1 if you want a pool-based allocation request to"
+		 "\n\t\t fall back to a heap-based allocation attempt");
 module_param(useHeapIfPoolUnavailable, int, S_IRUGO);
 
 static struct mutex cmem_mutex;
 
 /* Describes a pool buffer */
 typedef struct pool_buffer {
-    struct list_head element;
-    struct list_head users;
-    dma_addr_t dma;             /* used only for CMA-based allocs */
-    int id;
-    phys_addr_t physp;
-    int flags;			/* CMEM_CACHED or CMEM_NONCACHED */
-    void *kvirtp;		/* used only for CMA-based allocs */
-    unsigned long long size;	/* used only for heap-based allocs */
-    struct device *dev;		/* used only for CMA-based allocs */
-    struct vm_struct *vma;
+	struct list_head element;
+	struct list_head users;
+	dma_addr_t dma;             /* used only for CMA-based allocs */
+	int id;
+	phys_addr_t physp;
+	int flags;			/* CMEM_CACHED or CMEM_NONCACHED */
+	void *kvirtp;		/* used only for CMA-based allocs */
+	unsigned long long size;	/* used only for heap-based allocs */
+	struct device *dev;		/* used only for CMA-based allocs */
+	struct vm_struct *vma;
 } pool_buffer;
 
 typedef struct registered_user {
-    struct list_head element;
-    struct file *filp;
+	struct list_head element;
+	struct file *filp;
 } registered_user;
 
 struct cmem_dmabuf_attachment {
@@ -230,11 +230,11 @@ typedef struct pool_object pool_object;
 
 /* Describes a pool */
 typedef struct pool_object {
-    struct list_head freelist;
-    struct list_head busylist;
-    unsigned int numbufs;
-    unsigned long long size;
-    unsigned long long reqsize;
+	struct list_head freelist;
+	struct list_head busylist;
+	unsigned int numbufs;
+	unsigned long long size;
+	unsigned long long reqsize;
 } pool_object;
 
 static int cmem_cma_npools = 0;
@@ -269,11 +269,11 @@ static int open(struct inode *inode, struct file *filp);
 static int release(struct inode *inode, struct file *filp);
 
 static struct file_operations cmem_fxns = {
-    owner:   THIS_MODULE,
-    unlocked_ioctl: ioctl,
-    mmap:    mmap,
-    open:    open,
-    release: release
+	owner:   THIS_MODULE,
+	unlocked_ioctl: ioctl,
+	mmap:    mmap,
+	open:    open,
+	release: release
 };
 
 
@@ -298,8 +298,8 @@ static struct file_operations cmem_fxns = {
  * HeapMem compatibility stuff
  */
 typedef struct HeapMem_Header {
-    phys_addr_t next;
-    size_t size;
+	phys_addr_t next;
+	size_t size;
 } HeapMem_Header;
 
 #define ALLOCRUN 0
@@ -325,59 +325,59 @@ static int heap_pool[NBLOCKS + 1] = {-1, -1, -1, -1, 0};
 static unsigned long heap_size[NBLOCKS] = {0, 0, 0, 0};
 static phys_addr_t heap_physp[NBLOCKS] = {0, 0, 0, 0};
 static HeapMem_Header heap_head[NBLOCKS] = {
-    {
-	0,	/* next */
-	0	/* size */
-    },
-    {
-	0,	/* next */
-	0	/* size */
-    },
-    {
-	0,	/* next */
-	0	/* size */
-    },
+	{
+		0,	/* next */
+		0	/* size */
+	},
+	{
+		0,	/* next */
+		0	/* size */
+	},
+	{
+		0,	/* next */
+		0	/* size */
+	},
 /* cut-and-paste below as part of adding support for more than 4 blocks */
-    {
-	0,	/* next */
-	0	/* size */
-    },
+	{
+		0,	/* next */
+		0	/* size */
+	},
 /* cut-and-paste above as part of adding support for more than 4 blocks */
 };
 
 static int map_header(void **vaddrp, phys_addr_t physp, struct vm_struct **vm)
 {
-    unsigned long vaddr;
+	unsigned long vaddr;
 
-    *vm = __get_vm_area(PAGE_SIZE, VM_IOREMAP, VMALLOC_START, VMALLOC_END);
-    if (!*vm) {
+	*vm = __get_vm_area(PAGE_SIZE, VM_IOREMAP, VMALLOC_START, VMALLOC_END);
+	if (!*vm) {
 	__E("__get_vm_area() failed\n");
 
 	return -ENOMEM;
-    }
+	}
 
-    vaddr = (unsigned long)(*vm)->addr;
+	vaddr = (unsigned long)(*vm)->addr;
     if(ioremap_page_range((unsigned long)vaddr, (unsigned long)vaddr + PAGE_SIZE,
-                       physp, PAGE_KERNEL)) {
+				       physp, PAGE_KERNEL)) {
         __E("ioremap_page_range() failed\n");
-        free_vm_area(*vm);
-        *vm = NULL;
-        return -ENOMEM;
-    }
-    *vaddrp = (*vm)->addr;
+		free_vm_area(*vm);
+		*vm = NULL;
+		return -ENOMEM;
+	}
+	*vaddrp = (*vm)->addr;
 
     __D("map_header: ioremap_page_range(%#llx, %#lx)=0x%p\n",
-        (unsigned long long)physp, PAGE_SIZE, *vaddrp);
+		(unsigned long long)physp, PAGE_SIZE, *vaddrp);
 
-    return 0;
+	return 0;
 }
 
 static void unmap_header(void *vaddr, struct vm_struct *vm)
 {
-    __D("unmap_header: unmap_kernel_page_rage(0x%p, %#lx)\n", vaddr, PAGE_SIZE);
+	__D("unmap_header: unmap_kernel_page_rage(0x%p, %#lx)\n", vaddr, PAGE_SIZE);
 
-    unmap_kernel_range_noflush((unsigned long)vaddr, PAGE_SIZE);
-    free_vm_area(vm);
+	unmap_kernel_range_noflush((unsigned long)vaddr, PAGE_SIZE);
+	free_vm_area(vm);
 }
 
 /*
@@ -402,155 +402,155 @@ static void unmap_header(void *vaddr, struct vm_struct *vm)
  */
 phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
 {
-    struct vm_struct *curHeader_vm_area;
-    struct vm_struct *prevHeader_vm_area;
-    struct vm_struct *newHeader_vm_area;
-    HeapMem_Header *curHeader;
-    HeapMem_Header *prevHeader;
-    HeapMem_Header *newHeader;
-    phys_addr_t curHeaderPhys;
-    phys_addr_t prevHeaderPhys = 0;
-    phys_addr_t newHeaderPhys = 0;  /* init to quiet compiler */
-    phys_addr_t allocAddr;
-    size_t curSize, adjSize;
-    size_t remainSize;  /* free memory after allocated memory */
-    size_t adjAlign, offset;
-    int ret_value;
+	struct vm_struct *curHeader_vm_area;
+	struct vm_struct *prevHeader_vm_area;
+	struct vm_struct *newHeader_vm_area;
+	HeapMem_Header *curHeader;
+	HeapMem_Header *prevHeader;
+	HeapMem_Header *newHeader;
+	phys_addr_t curHeaderPhys;
+	phys_addr_t prevHeaderPhys = 0;
+	phys_addr_t newHeaderPhys = 0;  /* init to quiet compiler */
+	phys_addr_t allocAddr;
+	size_t curSize, adjSize;
+	size_t remainSize;  /* free memory after allocated memory */
+	size_t adjAlign, offset;
+	int ret_value;
 
-    adjSize = reqSize;
+	adjSize = reqSize;
 
-    /* Make size requested a multiple of HEAP_ALIGN */
-    if ((offset = (adjSize & (HEAP_ALIGN - 1))) != 0) {
-        adjSize = adjSize + (HEAP_ALIGN - offset);
-    }
+	/* Make size requested a multiple of HEAP_ALIGN */
+	if ((offset = (adjSize & (HEAP_ALIGN - 1))) != 0) {
+		adjSize = adjSize + (HEAP_ALIGN - offset);
+	}
 
-    /*
-     *  Make sure the alignment is at least as large as HEAP_ALIGN.
-     *  Note: adjAlign must be a power of 2 (by function constraint) and
-     *  HEAP_ALIGN is also a power of 2,
-     */
-    adjAlign = reqAlign;
-    if (adjAlign & (HEAP_ALIGN - 1)) {
-        /* adjAlign is less than HEAP_ALIGN */
-        adjAlign = HEAP_ALIGN;
-    }
+	/*
+	 *  Make sure the alignment is at least as large as HEAP_ALIGN.
+	 *  Note: adjAlign must be a power of 2 (by function constraint) and
+	 *  HEAP_ALIGN is also a power of 2,
+	 */
+	adjAlign = reqAlign;
+	if (adjAlign & (HEAP_ALIGN - 1)) {
+		/* adjAlign is less than HEAP_ALIGN */
+		adjAlign = HEAP_ALIGN;
+	}
 
-    /*
-     * The block will be allocated from curHeader. Maintain a pointer to
-     * prevHeader so prevHeader->next can be updated after the alloc.
-     */
-    curHeaderPhys = heap_head[bi].next;
+	/*
+	 * The block will be allocated from curHeader. Maintain a pointer to
+	 * prevHeader so prevHeader->next can be updated after the alloc.
+	 */
+	curHeaderPhys = heap_head[bi].next;
 
-    /* Loop over the free list. */
-    while (curHeaderPhys != 0) {
-        ret_value = map_header((void **)&curHeader, curHeaderPhys, &curHeader_vm_area);
-        if (ret_value < 0) {
-            return 0;
-        }
-        curSize = curHeader->size;
+	/* Loop over the free list. */
+	while (curHeaderPhys != 0) {
+		ret_value = map_header((void **)&curHeader, curHeaderPhys, &curHeader_vm_area);
+		if (ret_value < 0) {
+			return 0;
+		}
+		curSize = curHeader->size;
 
-        /*
-         *  Determine the offset from the beginning to make sure
-         *  the alignment request is honored.
-         */
-        offset = (unsigned long)curHeaderPhys & (adjAlign - 1);
-        if (offset) {
-            offset = adjAlign - offset;
-        }
+		/*
+		 *  Determine the offset from the beginning to make sure
+		 *  the alignment request is honored.
+		 */
+		offset = (unsigned long)curHeaderPhys & (adjAlign - 1);
+		if (offset) {
+			offset = adjAlign - offset;
+		}
 
-        /* big enough? */
-        if (curSize >= (adjSize + offset)) {
-            /* Set the pointer that will be returned. Alloc from front */
-            allocAddr = curHeaderPhys + offset;
+		/* big enough? */
+		if (curSize >= (adjSize + offset)) {
+			/* Set the pointer that will be returned. Alloc from front */
+			allocAddr = curHeaderPhys + offset;
 
-	    if (dryrun) {
-		return allocAddr;
-	    }
+			if (dryrun) {
+				return allocAddr;
+			}
 
-            /*
-             *  Determine the remaining memory after the allocated block.
-             *  Note: this cannot be negative because of above comparison.
-             */
-            remainSize = curSize - adjSize - offset;
+			/*
+			 *  Determine the remaining memory after the allocated block.
+			 *  Note: this cannot be negative because of above comparison.
+			 */
+			remainSize = curSize - adjSize - offset;
 
-	    if (remainSize) {
-		newHeaderPhys = allocAddr + adjSize;
+			if (remainSize) {
+				newHeaderPhys = allocAddr + adjSize;
 				ret_value = map_header((void **)&newHeader, newHeaderPhys,
-						       &newHeader_vm_area);
+							   &newHeader_vm_area);
 				if (ret_value < 0)
 					return 0;
 
-		newHeader->next = curHeader->next;
-		newHeader->size = remainSize;
+				newHeader->next = curHeader->next;
+				newHeader->size = remainSize;
 
-		unmap_header(newHeader, newHeader_vm_area);
-	    }
+				unmap_header(newHeader, newHeader_vm_area);
+			}
 
-            /*
-             *  If there is memory at the beginning (due to alignment
-             *  requirements), maintain it in the list.
-             *
-             *  offset and remainSize must be multiples of
-             *  HEAP_ALIGN. Therefore the address of the newHeader
-             *  below must be a multiple of the HEAP_ALIGN, thus
-             *  maintaining the requirement.
-             */
-            if (offset) {
-                /* Adjust the curHeader size accordingly */
-                curHeader->size = offset;
+			/*
+			 *  If there is memory at the beginning (due to alignment
+			 *  requirements), maintain it in the list.
+			 *
+			 *  offset and remainSize must be multiples of
+			 *  HEAP_ALIGN. Therefore the address of the newHeader
+			 *  below must be a multiple of the HEAP_ALIGN, thus
+			 *  maintaining the requirement.
+			 */
+			if (offset) {
+				/* Adjust the curHeader size accordingly */
+				curHeader->size = offset;
 
-                /*
-                 *  If there is remaining memory, add into the free list.
-                 *  Note: no need to coalesce and we have HeapMem locked so
-                 *        it is safe.
-                 */
-                if (remainSize) {
-                    curHeader->next = newHeaderPhys;
-                }
-            }
-            else {
-                /*
-                 *  If there is any remaining, link it in,
-                 *  else point to the next free block.
-                 *  Note: no need to coalesce and we have HeapMem locked so
-                 *        it is safe.
-                 */
-		if (prevHeaderPhys != 0) {
+				/*
+				 *  If there is remaining memory, add into the free list.
+				 *  Note: no need to coalesce and we have HeapMem locked so
+				 *		it is safe.
+				 */
+				if (remainSize) {
+					curHeader->next = newHeaderPhys;
+				}
+			}
+			else {
+				/*
+				 *  If there is any remaining, link it in,
+				 *  else point to the next free block.
+				 *  Note: no need to coalesce and we have HeapMem locked so
+				 *        it is safe.
+				 */
+				if (prevHeaderPhys != 0) {
 					ret_value = map_header((void **)&prevHeader, prevHeaderPhys,
 								   &prevHeader_vm_area);
 					if (ret_value < 0)
 						return 0;
+			}
+			else {
+				prevHeader = &heap_head[bi];
+			}
+
+			if (remainSize) {
+				prevHeader->next = newHeaderPhys;
+			}
+			else {
+				prevHeader->next = curHeader->next;
+			}
+
+			if (prevHeader != &heap_head[bi]) {
+				unmap_header(prevHeader, prevHeader_vm_area);
+				}
+			}
+
+			unmap_header(curHeader, curHeader_vm_area);
+
+			/* Success, return the allocated memory */
+			return allocAddr;
 		}
 		else {
-		    prevHeader = &heap_head[bi];
+			prevHeaderPhys = curHeaderPhys;
+			curHeaderPhys = curHeader->next;
+
+			unmap_header(curHeader, curHeader_vm_area);
 		}
+	}
 
-                if (remainSize) {
-                    prevHeader->next = newHeaderPhys;
-                }
-                else {
-                    prevHeader->next = curHeader->next;
-                }
-
-		if (prevHeader != &heap_head[bi]) {
-		    unmap_header(prevHeader, prevHeader_vm_area);
-		}
-            }
-
-	    unmap_header(curHeader, curHeader_vm_area);
-
-            /* Success, return the allocated memory */
-            return allocAddr;
-        }
-        else {
-	    prevHeaderPhys = curHeaderPhys;
-	    curHeaderPhys = curHeader->next;
-
-	    unmap_header(curHeader, curHeader_vm_area);
-        }
-    }
-
-    return 0;
+	return 0;
 }
 
 /*
@@ -558,170 +558,170 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
  */
 void HeapMem_free(int bi, phys_addr_t block, size_t size)
 {
-    struct vm_struct *curHeader_vm_area;
-    struct vm_struct *newHeader_vm_area;
-    struct vm_struct *nextHeader_vm_area;
-    HeapMem_Header *curHeader;
-    HeapMem_Header *newHeader;
-    HeapMem_Header *nextHeader;
-    phys_addr_t curHeaderPhys = 0;
-    phys_addr_t newHeaderPhys;
-    phys_addr_t nextHeaderPhys;
-    size_t offset;
-    int ret_value;
+	struct vm_struct *curHeader_vm_area;
+	struct vm_struct *newHeader_vm_area;
+	struct vm_struct *nextHeader_vm_area;
+	HeapMem_Header *curHeader;
+	HeapMem_Header *newHeader;
+	HeapMem_Header *nextHeader;
+	phys_addr_t curHeaderPhys = 0;
+	phys_addr_t newHeaderPhys;
+	phys_addr_t nextHeaderPhys;
+	size_t offset;
+	int ret_value;
 
-    /* Restore size to actual allocated size */
-    if ((offset = size & (HEAP_ALIGN - 1)) != 0) {
-        size += HEAP_ALIGN - offset;
-    }
+	/* Restore size to actual allocated size */
+	if ((offset = size & (HEAP_ALIGN - 1)) != 0) {
+		size += HEAP_ALIGN - offset;
+	}
 
-    newHeaderPhys = block;
-    nextHeaderPhys = heap_head[bi].next;
+	newHeaderPhys = block;
+	nextHeaderPhys = heap_head[bi].next;
 
-    /* Go down freelist and find right place for buf */
-    while (nextHeaderPhys != 0 && nextHeaderPhys < newHeaderPhys) {
+	/* Go down freelist and find right place for buf */
+	while (nextHeaderPhys != 0 && nextHeaderPhys < newHeaderPhys) {
 		ret_value = map_header((void **)&nextHeader, nextHeaderPhys, &nextHeader_vm_area);
 		if (ret_value < 0)
 			return;
 
-        curHeaderPhys = nextHeaderPhys;
-        nextHeaderPhys = nextHeader->next;
+		curHeaderPhys = nextHeaderPhys;
+		nextHeaderPhys = nextHeader->next;
 
-	unmap_header(nextHeader, nextHeader_vm_area);
-    }
+		unmap_header(nextHeader, nextHeader_vm_area);
+	}
 
 	ret_value = map_header((void **)&newHeader, newHeaderPhys, &newHeader_vm_area);
 	if (ret_value < 0)
 		return;
 
-    if (curHeaderPhys != 0) {
+	if (curHeaderPhys != 0) {
 		ret_value = map_header((void **)&curHeader, curHeaderPhys, &curHeader_vm_area);
 		if (ret_value < 0)
 			return;
-    }
-    else {
-	curHeader = &heap_head[bi];
-    }
+		}
+	else {
+		curHeader = &heap_head[bi];
+	}
 
-    newHeader->next = nextHeaderPhys;
-    newHeader->size = size;
-    curHeader->next = newHeaderPhys;
+	newHeader->next = nextHeaderPhys;
+	newHeader->size = size;
+	curHeader->next = newHeaderPhys;
 
-    /* Join contiguous free blocks */
-    /* Join with upper block */
-    if (nextHeaderPhys != 0 && (newHeaderPhys + size) == nextHeaderPhys) {
+	/* Join contiguous free blocks */
+	/* Join with upper block */
+	if (nextHeaderPhys != 0 && (newHeaderPhys + size) == nextHeaderPhys) {
 		ret_value = map_header((void **)&nextHeader, nextHeaderPhys, &nextHeader_vm_area);
 		if (ret_value < 0)
 			return;
-        newHeader->next = nextHeader->next;
-        newHeader->size += nextHeader->size;
+		newHeader->next = nextHeader->next;
+		newHeader->size += nextHeader->size;
 
-	unmap_header(nextHeader, nextHeader_vm_area);
-    }
-
-    /*
-     * Join with lower block. Make sure to check to see if not the
-     * first block.
-     */
-    if (curHeader != &heap_head[bi]) {
-        if ((curHeaderPhys + curHeader->size) == newHeaderPhys) {
-	    curHeader->next = newHeader->next;
-	    curHeader->size += newHeader->size;
+		unmap_header(nextHeader, nextHeader_vm_area);
 	}
 
-	unmap_header(curHeader, curHeader_vm_area);
-    }
+	/*
+	 * Join with lower block. Make sure to check to see if not the
+	 * first block.
+	 */
+	if (curHeader != &heap_head[bi]) {
+		if ((curHeaderPhys + curHeader->size) == newHeaderPhys) {
+			curHeader->next = newHeader->next;
+			curHeader->size += newHeader->size;
+		}
 
-    unmap_header(newHeader, newHeader_vm_area);
+		unmap_header(curHeader, curHeader_vm_area);
+	}
+
+	unmap_header(newHeader, newHeader_vm_area);
 }
 
 /* Traverses the page tables and translates a virtual address to a physical. */
 static phys_addr_t get_phys(void *virtp)
 {
-    unsigned long virt = (unsigned long)virtp;
-    phys_addr_t physp = ~(0LL);
-    struct mm_struct *mm = current->mm;
-    struct vm_area_struct *vma;
+	unsigned long virt = (unsigned long)virtp;
+	phys_addr_t physp = ~(0LL);
+	struct mm_struct *mm = current->mm;
+	struct vm_area_struct *vma;
 
-    /* For kernel direct-mapped memory, take the easy way */
-    if (virt >= PAGE_OFFSET) {
-        physp = virt_to_phys(virtp);
-	__D("get_phys: virt_to_phys translated direct-mapped %#lx to %#llx\n",
-	    virt, (unsigned long long)physp);
-    }
-    down_read(&current->mm->mmap_sem);
-    vma = find_vma(mm, virt);
-    up_read(&current->mm->mmap_sem);
-    /* this will catch, kernel-allocated, mmaped-to-usermode addresses */
-    if (vma  &&
-             (vma->vm_flags & VM_IO) &&
-             (vma->vm_pgoff)) {
-        physp = ((unsigned long long)vma->vm_pgoff << PAGE_SHIFT) +
-	        (virt - vma->vm_start);
-	__D("get_phys: find_vma translated user %#lx to %#llx\n", virt,
-	    (unsigned long long)physp);
-    }
+	/* For kernel direct-mapped memory, take the easy way */
+	if (virt >= PAGE_OFFSET) {
+		physp = virt_to_phys(virtp);
+		__D("get_phys: virt_to_phys translated direct-mapped %#lx to %#llx\n",
+		    virt, (unsigned long long)physp);
+	}
+	down_read(&current->mm->mmap_sem);
+	vma = find_vma(mm, virt);
+	up_read(&current->mm->mmap_sem);
+	/* this will catch, kernel-allocated, mmaped-to-usermode addresses */
+	if (vma  &&
+	    (vma->vm_flags & VM_IO) &&
+	    (vma->vm_pgoff)) {
+		physp = ((unsigned long long)vma->vm_pgoff << PAGE_SHIFT) +
+			(virt - vma->vm_start);
+		__D("get_phys: find_vma translated user %#lx to %#llx\n", virt,
+		    (unsigned long long)physp);
+	}
 
-    /* otherwise, use get_user_pages() for general userland pages */
-    else {
-        int res, nr_pages = 1;
-        struct page *pages;
+	/* otherwise, use get_user_pages() for general userland pages */
+	else {
+		int res, nr_pages = 1;
+		struct page *pages;
 
-        down_read(&current->mm->mmap_sem);
+		down_read(&current->mm->mmap_sem);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0))
-        res = get_user_pages_remote(current, current->mm, virt, nr_pages,
-                                    FOLL_WRITE, &pages, NULL, NULL);
+		res = get_user_pages_remote(current, current->mm, virt, nr_pages,
+					    FOLL_WRITE, &pages, NULL, NULL);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
-        res = get_user_pages_remote(current, current->mm, virt, nr_pages,
-                                    FOLL_WRITE, &pages, NULL);
+		res = get_user_pages_remote(current, current->mm, virt, nr_pages,
+					    FOLL_WRITE, &pages, NULL);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0))
-        res = get_user_pages_remote(current, current->mm, virt, nr_pages,
-                                    1, 0, &pages, NULL);
+		res = get_user_pages_remote(current, current->mm, virt, nr_pages,
+					    1, 0, &pages, NULL);
 #else
-        res = get_user_pages(current, current->mm, virt, nr_pages, 1, 0,
-                             &pages, NULL);
+		res = get_user_pages(current, current->mm, virt, nr_pages, 1, 0,
+				     &pages, NULL);
 #endif
-        up_read(&current->mm->mmap_sem);
+		up_read(&current->mm->mmap_sem);
 
-        if (res == nr_pages) {
-            physp = __pa(page_address(&pages[0]) + (virt & ~PAGE_MASK));
-	    __D("get_phys: get_user_pages translated user %#lx to %#llx\n",
-	        virt, (unsigned long long)physp);
-        } else {
-            __E("%s: Unable to find phys addr for %#lx\n",
-                __FUNCTION__, virt);
-            __E("%s: get_user_pages() failed: %d\n", __FUNCTION__, res);
-        }
-    }
+		if (res == nr_pages) {
+			physp = __pa(page_address(&pages[0]) + (virt & ~PAGE_MASK));
+			__D("get_phys: get_user_pages translated user %#lx to %#llx\n",
+			    virt, (unsigned long long)physp);
+		} else {
+			__E("%s: Unable to find phys addr for %#lx\n",
+				__FUNCTION__, virt);
+			__E("%s: get_user_pages() failed: %d\n", __FUNCTION__, res);
+		}
+	}
 
-    return physp;
+	return physp;
 }
 
 /* Allocates space from the top "highmem" contiguous buffer for pool buffer. */
 static phys_addr_t alloc_pool_buffer(int bi, unsigned long long size)
 {
-    phys_addr_t physp;
+	phys_addr_t physp;
 
-    __D("alloc_pool_buffer: Called for size 0x%llx\n", size);
+	__D("alloc_pool_buffer: Called for size 0x%llx\n", size);
 
-    if (size <= block_avail_size[bi]) {
-        __D("alloc_pool_buffer: Fits req %#llx < avail: %#llx\n",
-            size, block_avail_size[bi]);
-        block_avail_size[bi] -= size;
-        physp = block_start[bi] + block_avail_size[bi];
+	if (size <= block_avail_size[bi]) {
+		__D("alloc_pool_buffer: Fits req %#llx < avail: %#llx\n",
+			size, block_avail_size[bi]);
+		block_avail_size[bi] -= size;
+		physp = block_start[bi] + block_avail_size[bi];
 
-        __D("alloc_pool_buffer: new available block size is %#llx\n",
-            block_avail_size[bi]);
+		__D("alloc_pool_buffer: new available block size is %#llx\n",
+			block_avail_size[bi]);
 
-        __D("alloc_pool_buffer: returning allocated buffer at %#llx\n",
-	    (unsigned long long)physp);
+		__D("alloc_pool_buffer: returning allocated buffer at %#llx\n",
+		(unsigned long long)physp);
 
-        return physp;
-    }
+		return physp;
+	}
 
-    __E("Failed to find a big enough free block\n");
+	__E("Failed to find a big enough free block\n");
 
-    return 0;
+	return 0;
 }
 
 
@@ -729,40 +729,40 @@ static phys_addr_t alloc_pool_buffer(int bi, unsigned long long size)
 /* Only for debug */
 static void dump_lists(int bi, int idx)
 {
-    struct list_head *freelistp = &p_objs[bi][idx].freelist;
-    struct list_head *busylistp = &p_objs[bi][idx].busylist;
-    struct list_head *e;
-    struct pool_buffer *entry;
+	struct list_head *freelistp = &p_objs[bi][idx].freelist;
+	struct list_head *busylistp = &p_objs[bi][idx].busylist;
+	struct list_head *e;
+	struct pool_buffer *entry;
 
 /* way too chatty, neuter for now */
 return;
 
-    if (mutex_lock_interruptible(&cmem_mutex)) {
-        return;
-    }
+	if (mutex_lock_interruptible(&cmem_mutex)) {
+		return;
+	}
 
-    __D("Busylist for pool %d:\n", idx);
-    for (e = busylistp->next; e != busylistp; e = e->next) {
+	__D("Busylist for pool %d:\n", idx);
+	for (e = busylistp->next; e != busylistp; e = e->next) {
 
-        entry = list_entry(e, struct pool_buffer, element);
-        if ( entry != NULL )
-            __D("Busy: Buffer with id %d and physical address %#llx\n",
-                entry->id, (unsigned long long)entry->physp);
-        }
+		entry = list_entry(e, struct pool_buffer, element);
+		if ( entry != NULL )
+			__D("Busy: Buffer with id %d and physical address %#llx\n",
+			    entry->id, (unsigned long long)entry->physp);
+	}
 
-        if (bi < NBLOCKS) {
+	if (bi < NBLOCKS) {
 
-        __D("Freelist for pool %d:\n", idx);
-        for (e = freelistp->next; e != freelistp; e = e->next) {
+		__D("Freelist for pool %d:\n", idx);
+		for (e = freelistp->next; e != freelistp; e = e->next) {
 
-        entry = list_entry(e, struct pool_buffer, element);
-        if ( entry != NULL )
-            __D("Free: Buffer with id %d and physical address %#llx\n",
-                entry->id, (unsigned long long)entry->physp);
-        }
-    }
+			entry = list_entry(e, struct pool_buffer, element);
+			if ( entry != NULL )
+				__D("Free: Buffer with id %d and physical address %#llx\n",
+				    entry->id, (unsigned long long)entry->physp);
+		}
+	}
 
-    mutex_unlock(&cmem_mutex);
+	mutex_unlock(&cmem_mutex);
 }
 #endif
 
@@ -775,49 +775,49 @@ return;
  */
 static struct pool_buffer *find_busy_entry(phys_addr_t physp, int *poolp, struct list_head **ep, int *bip, size_t *sizep)
 {
-    struct list_head *busylistp;
-    struct list_head *e;
-    struct pool_buffer *entry;
-    int num_pools;
-    int i;
-    int bi;
+	struct list_head *busylistp;
+	struct list_head *e;
+	struct pool_buffer *entry;
+	int num_pools;
+	int i;
+	int bi;
 
-    /* loop for NBLOCKS + 1 to handle special CMA global area "block" */
-    for (bi = 0; bi < (NBLOCKS + 1); bi++) {
-	num_pools = npools[bi];
-	if (heap_pool[bi] != -1) {
-	    num_pools++;
-	}
-
-	for (i = 0; i < num_pools; i++) {
-	    busylistp = &p_objs[bi][i].busylist;
-
-	    for (e = busylistp->next; e != busylistp; e = e->next) {
-		entry = list_entry(e, struct pool_buffer, element);
-		if ((!sizep && entry->physp == physp) ||
-		     (sizep &&
-		       (physp >= entry->physp &&
-		         (physp + *sizep) <= (entry->physp + entry->size)
-		       )
-		     )
-		   ) {
-		    if (poolp) {
-			*poolp = i;
-		    }
-		    if (ep) {
-			*ep = e;
-		    }
-		    if (bip) {
-			*bip = bi;
-		    }
-
-		    return entry;
+	/* loop for NBLOCKS + 1 to handle special CMA global area "block" */
+	for (bi = 0; bi < (NBLOCKS + 1); bi++) {
+		num_pools = npools[bi];
+		if (heap_pool[bi] != -1) {
+			num_pools++;
 		}
-	    }
-	}
-    }
 
-    return NULL;
+		for (i = 0; i < num_pools; i++) {
+			busylistp = &p_objs[bi][i].busylist;
+
+			for (e = busylistp->next; e != busylistp; e = e->next) {
+				entry = list_entry(e, struct pool_buffer, element);
+				if ((!sizep && entry->physp == physp) ||
+				    (sizep &&
+				     (physp >= entry->physp &&
+				      (physp + *sizep) <= (entry->physp + entry->size)
+				     )
+				    )
+				   ) {
+					if (poolp) {
+						*poolp = i;
+					}
+					if (ep) {
+						*ep = e;
+					}
+					if (bip) {
+						*bip = bi;
+					}
+
+					return entry;
+				}
+			}
+		}
+	}
+
+	return NULL;
 }
 
 static void cmem_seq_stop(struct seq_file *s, void *v);
@@ -826,10 +826,10 @@ static void *cmem_seq_next(struct seq_file *s, void *v, loff_t *pos);
 static int cmem_seq_show(struct seq_file *s, void *v);
 
 static struct seq_operations cmem_seq_ops = {
-    .start = cmem_seq_start,
-    .next = cmem_seq_next,
-    .stop = cmem_seq_stop,
-    .show = cmem_seq_show,
+	.start = cmem_seq_start,
+	.next = cmem_seq_next,
+	.stop = cmem_seq_stop,
+	.show = cmem_seq_show,
 };
 
 #define SHOW_BUSY_BANNER (1 << 0)
@@ -840,152 +840,152 @@ static struct seq_operations cmem_seq_ops = {
 
 void *find_buffer_n(struct seq_file *s, int n)
 {
-    struct list_head *listp = NULL;
-    int busy_empty;
-    int free_empty = 0;
-    int found = 0;
-    int count;
-    int i;
-    int bi;
+	struct list_head *listp = NULL;
+	int busy_empty;
+	int free_empty = 0;
+	int found = 0;
+	int count;
+	int i;
+	int bi;
 
-    __D("find_buffer_n: n=%d\n", n);
+	__D("find_buffer_n: n=%d\n", n);
 
-    s->private = (void *)0;
-    count = 0;
+	s->private = (void *)0;
+	count = 0;
 
-    for (bi = 0; bi < NBLOCKS; bi++) {
+	for (bi = 0; bi < NBLOCKS; bi++) {
 	for (i = 0; i < npools[bi]; i++) {
-	    listp = &p_objs[bi][i].busylist;
-	    listp = listp->next;
-	    busy_empty = 1;
-	    while (listp != &p_objs[bi][i].busylist) {
+		listp = &p_objs[bi][i].busylist;
+		listp = listp->next;
+		busy_empty = 1;
+		while (listp != &p_objs[bi][i].busylist) {
 		busy_empty = 0;
 		if (count == n) {
-		    found = 1;
-		    s->private = (void *)((int)s->private | BUSY_ENTRY);
+			found = 1;
+			s->private = (void *)((int)s->private | BUSY_ENTRY);
 
-		    break;
+			break;
 		}
 		count++;
 		listp = listp->next;
-	    }
-	    if (found) {
+		}
+		if (found) {
 		break;
-	    }
+		}
 
-	    listp = &p_objs[bi][i].freelist;
-	    listp = listp->next;
-	    free_empty = 1;
-	    while (listp != &p_objs[bi][i].freelist) {
+		listp = &p_objs[bi][i].freelist;
+		listp = listp->next;
+		free_empty = 1;
+		while (listp != &p_objs[bi][i].freelist) {
 		if (i == 0 ||
-		    (p_objs[bi][i - 1].freelist.next !=
-		    &p_objs[bi][i - 1].freelist)) {
+			(p_objs[bi][i - 1].freelist.next !=
+			&p_objs[bi][i - 1].freelist)) {
 
-		    free_empty = 0;
+			free_empty = 0;
 		}
 		if (count == n) {
-		    found = 1;
-		    s->private = (void *)((int)s->private | FREE_ENTRY);
+			found = 1;
+			s->private = (void *)((int)s->private | FREE_ENTRY);
 
-		    break;
+			break;
 		}
 		count++;
 		listp = listp->next;
-	    }
-	    if (found) {
+		}
+		if (found) {
 		break;
-	    }
+		}
 	}
 	if (found) {
-	    break;
+		break;
 	}
-    }
+	}
 
-    if (!found) {
+	if (!found) {
 	listp = NULL;
-    }
-    else {
+	}
+	else {
 	if (busy_empty) {
-	    s->private = (void *)((int)s->private | SHOW_BUSY_BANNER);
+		s->private = (void *)((int)s->private | SHOW_BUSY_BANNER);
 	}
 	if (free_empty) {
-	    s->private = (void *)((int)s->private | SHOW_PREV_FREE_BANNER);
+		s->private = (void *)((int)s->private | SHOW_PREV_FREE_BANNER);
 	}
 	if (count == (total_num_buffers[bi] - 1)) {
-	    s->private = (void *)((int)s->private | SHOW_LAST_FREE_BANNER);
+		s->private = (void *)((int)s->private | SHOW_LAST_FREE_BANNER);
 	}
-    }
+	}
 
-    return listp;
+	return listp;
 }
 
 static void cmem_seq_stop(struct seq_file *s, void *v)
 {
-    __D("cmem_seq_stop: v=0x%p\n", v);
+	__D("cmem_seq_stop: v=0x%p\n", v);
 
-    mutex_unlock(&cmem_mutex);
+	mutex_unlock(&cmem_mutex);
 }
 
 static void *cmem_seq_start(struct seq_file *s, loff_t *pos)
 {
-    struct list_head *listp;
-    int total_num;
+	struct list_head *listp;
+	int total_num;
 
-    if (mutex_lock_interruptible(&cmem_mutex)) {
+	if (mutex_lock_interruptible(&cmem_mutex)) {
 	return ERR_PTR(-ERESTARTSYS);
-    }
+	}
 
-    __D("cmem_seq_start: *pos=%d\n", (int)*pos);
+	__D("cmem_seq_start: *pos=%d\n", (int)*pos);
 
-    total_num = total_num_buffers[0] + total_num_buffers[1];
-    if (*pos >= total_num) {
+	total_num = total_num_buffers[0] + total_num_buffers[1];
+	if (*pos >= total_num) {
 	__D("  %d >= %d\n", (int)*pos, total_num);
 
 	return NULL;
-    }
+	}
 
-    listp = find_buffer_n(s, *pos);
+	listp = find_buffer_n(s, *pos);
 
-    __D("  returning 0x%p\n", listp);
+	__D("  returning 0x%p\n", listp);
 
-    return listp;
+	return listp;
 }
 
 static void *cmem_seq_next(struct seq_file *s, void *v, loff_t *pos)
 {
-    struct list_head *listp;
-    int total_num;
+	struct list_head *listp;
+	int total_num;
 
-    __D("cmem_seq_next: *pos=%d\n", (int)*pos);
+	__D("cmem_seq_next: *pos=%d\n", (int)*pos);
 
-    __D("  incrementing *pos\n");
-    ++(*pos);
+	__D("  incrementing *pos\n");
+	++(*pos);
 
-    total_num = total_num_buffers[0] + total_num_buffers[1];
-    if (*pos >= total_num) {
+	total_num = total_num_buffers[0] + total_num_buffers[1];
+	if (*pos >= total_num) {
 	__D("  %d >= %d\n", (int)*pos, total_num);
 
 	return NULL;
-    }
+	}
 
-    listp = find_buffer_n(s, *pos);
+	listp = find_buffer_n(s, *pos);
 
-    __D("  returning 0x%p\n", listp);
+	__D("  returning 0x%p\n", listp);
 
-    return listp;
+	return listp;
 }
 
 void show_busy_banner(int bi, struct seq_file *s, int n)
 {
-    seq_printf(s, "\nBlock %d: Pool %d: %d bufs size 0x%llx"
-                      " (0x%llx requested)\n\nPool %d busy bufs:\n",
-                      bi, n, p_objs[bi][n].numbufs, p_objs[bi][n].size,
-                      p_objs[bi][n].reqsize, n);
+	seq_printf(s, "\nBlock %d: Pool %d: %d bufs size 0x%llx"
+		   " (0x%llx requested)\n\nPool %d busy bufs:\n",
+		   bi, n, p_objs[bi][n].numbufs, p_objs[bi][n].size,
+		   p_objs[bi][n].reqsize, n);
 }
 
 void show_free_banner(struct seq_file *s, int n)
 {
-    seq_printf(s, "\nPool %d free bufs:\n", n);
+	seq_printf(s, "\nPool %d free bufs:\n", n);
 }
 
 /*
@@ -994,155 +994,155 @@ void show_free_banner(struct seq_file *s, int n)
  */
 static int cmem_seq_show(struct seq_file *s, void *v)
 {
-    struct list_head *listp = v;
-    struct list_head *e = v;
-    struct pool_buffer *entry;
-    char *attr;
-    int i;
-    int bi;
+	struct list_head *listp = v;
+	struct list_head *e = v;
+	struct pool_buffer *entry;
+	char *attr;
+	int i;
+	int bi;
 
-    __D("cmem_seq_show:\n");
+	__D("cmem_seq_show:\n");
 
-    for (bi = 0; bi < NBLOCKS; bi++) {
+	for (bi = 0; bi < NBLOCKS; bi++) {
 	/* look for banners to show */
 	for (i = 0; i < npools[bi]; i++) {
-	    if (listp == p_objs[bi][i].busylist.next) {
+		if (listp == p_objs[bi][i].busylist.next) {
 		/* first buffer in busylist */
 		if ((int)s->private & SHOW_PREV_FREE_BANNER) {
-		    /*
-		     * Previous pool's freelist empty, need to show banner.
-		     */
-		    show_free_banner(s, i - 1);
+			/*
+			 * Previous pool's freelist empty, need to show banner.
+			 */
+			show_free_banner(s, i - 1);
 		}
 		show_busy_banner(bi, s, i);
 
 		break;
-	    }
-	    if (listp == p_objs[bi][i].freelist.next) {
+		}
+		if (listp == p_objs[bi][i].freelist.next) {
 		/* first buffer in freelist */
 		if ((int)s->private & SHOW_PREV_FREE_BANNER) {
-		    /*
-		     * Previous pool's freelist & this pool's busylist empty,
-		     * need to show banner.
-		     */
-		    show_free_banner(s, i - 1);
+			/*
+			 * Previous pool's freelist & this pool's busylist empty,
+			 * need to show banner.
+			 */
+			show_free_banner(s, i - 1);
 		}
 		if ((int)s->private & SHOW_BUSY_BANNER) {
-		    /*
-		     * This pool's busylist empty, need to show banner.
-		     */
-		    show_busy_banner(bi, s, i);
+			/*
+			 * This pool's busylist empty, need to show banner.
+			 */
+			show_busy_banner(bi, s, i);
 		}
 		show_free_banner(s, i);
 
 		break;
-	    }
+		}
 	}
-    }
+	}
 
-    entry = list_entry(e, struct pool_buffer, element);
+	entry = list_entry(e, struct pool_buffer, element);
 
-    if ((int)s->private & BUSY_ENTRY) {
+	if ((int)s->private & BUSY_ENTRY) {
 	attr = entry->flags & CMEM_CACHED ? "(cached)" : "(noncached)";
 	seq_printf(s, "id %d: phys addr %#llx %s\n", entry->id,
-                   (unsigned long long)entry->physp, attr);
-    }
-    else {
+		   (unsigned long long)entry->physp, attr);
+	}
+	else {
 	seq_printf(s, "id %d: phys addr %#llx\n", entry->id,
-	                (unsigned long long)entry->physp);
-    }
+		   (unsigned long long)entry->physp);
+	}
 
-    if ((int)s->private & BUSY_ENTRY &&
-        (int)s->private & SHOW_LAST_FREE_BANNER) {
+	if ((int)s->private & BUSY_ENTRY &&
+		(int)s->private & SHOW_LAST_FREE_BANNER) {
 
-	/* FIXME */
-	show_free_banner(s, npools[0] - 1);
-    }
+		/* FIXME */
+		show_free_banner(s, npools[0] - 1);
+	}
 
-    return 0;
+	return 0;
 }
 
 static int cmem_proc_open(struct inode *inode, struct file *file);
 
 static struct file_operations cmem_proc_ops = {
-    .owner = THIS_MODULE,
-    .open = cmem_proc_open,
-    .read = seq_read,
-    .llseek = seq_lseek,
-    .release = seq_release,
+	.owner = THIS_MODULE,
+	.open = cmem_proc_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
 };
 
 static int cmem_proc_open(struct inode *inode, struct file *file)
 {
-    return seq_open(file, &cmem_seq_ops);
+	return seq_open(file, &cmem_seq_ops);
 }
 
 /* Allocate a contiguous memory pool. */
 static int alloc_pool(int bi, int idx, int num, unsigned long long reqsize, phys_addr_t *physpRet)
 {
-    struct pool_buffer *entry;
-    struct list_head *freelistp = &p_objs[bi][idx].freelist;
-    struct list_head *busylistp = &p_objs[bi][idx].busylist;
-    unsigned long long size = PAGE_ALIGN(reqsize);
-    phys_addr_t physp;
-    int i;
+	struct pool_buffer *entry;
+	struct list_head *freelistp = &p_objs[bi][idx].freelist;
+	struct list_head *busylistp = &p_objs[bi][idx].busylist;
+	unsigned long long size = PAGE_ALIGN(reqsize);
+	phys_addr_t physp;
+	int i;
 
-    __D("Allocating %d buffers of size 0x%llx (requested 0x%llx)\n",
-                num, size, reqsize);
+	__D("Allocating %d buffers of size 0x%llx (requested 0x%llx)\n",
+	    num, size, reqsize);
 
-    p_objs[bi][idx].reqsize = reqsize;
-    p_objs[bi][idx].numbufs = num;
-    p_objs[bi][idx].size = size;
+	p_objs[bi][idx].reqsize = reqsize;
+	p_objs[bi][idx].numbufs = num;
+	p_objs[bi][idx].size = size;
 
-    INIT_LIST_HEAD(freelistp);
-    INIT_LIST_HEAD(busylistp);
+	INIT_LIST_HEAD(freelistp);
+	INIT_LIST_HEAD(busylistp);
 
-    for (i = 0; i < num; i++) {
-        entry = kmalloc(sizeof(struct pool_buffer), GFP_KERNEL);
+	for (i = 0; i < num; i++) {
+		entry = kmalloc(sizeof(struct pool_buffer), GFP_KERNEL);
 
-        if (!entry) {
-            __E("alloc_pool failed to malloc pool_buffer struct");
-            return -ENOMEM;
-        }
+		if (!entry) {
+			__E("alloc_pool failed to malloc pool_buffer struct");
+			return -ENOMEM;
+		}
 
-        physp = alloc_pool_buffer(bi, size);
+		physp = alloc_pool_buffer(bi, size);
 
-        if (physp == 0) {
-            __E("alloc_pool failed to get contiguous area of size %llu\n",
-                size);
+		if (physp == 0) {
+			__E("alloc_pool failed to get contiguous area of size %llu\n",
+			    size);
 
-            /*
-             * Need to free this entry now since it didn't get added to
-             * a list that will be freed during module removal (cmem_exit())
-             * Fixes SDSCM00027040.
-             */
-            kfree(entry);
+			/*
+			 * Need to free this entry now since it didn't get added to
+			 * a list that will be freed during module removal (cmem_exit())
+			 * Fixes SDSCM00027040.
+			 */
+			kfree(entry);
 
-            return -ENOMEM;
-        }
+			return -ENOMEM;
+		}
 
-        entry->id = i;
-        entry->physp = physp;
-        entry->size = size;
-        entry->kvirtp = NULL;
-        entry->vma = NULL;
-        INIT_LIST_HEAD(&entry->users);
+		entry->id = i;
+		entry->physp = physp;
+		entry->size = size;
+		entry->kvirtp = NULL;
+		entry->vma = NULL;
+		INIT_LIST_HEAD(&entry->users);
 
-        if (physpRet) {
-            *physpRet++ = physp;
-        }
+		if (physpRet) {
+			*physpRet++ = physp;
+		}
 
-        __D("Allocated buffer %d, physical %#llx and size %#llx\n",
-            entry->id, (unsigned long long)entry->physp, size);
+		__D("Allocated buffer %d, physical %#llx and size %#llx\n",
+			entry->id, (unsigned long long)entry->physp, size);
 
-        list_add_tail(&entry->element, freelistp);
-    }
+		list_add_tail(&entry->element, freelistp);
+	}
 
 #ifdef __DEBUG
-    dump_lists(bi, idx);
+	dump_lists(bi, idx);
 #endif
 
-    return 0;
+	return 0;
 }
 
 static int mmap_buffer(struct pool_buffer *entry, struct vm_area_struct *vma,
@@ -1440,97 +1440,97 @@ EXPORT_SYMBOL(cmem_dmabuf_export);
 
 static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 {
-    unsigned int __user *argp = (unsigned int __user *) args;
-    unsigned long long __user *llargp = (unsigned long long __user *) args;
-    unsigned long virtArg;
-    unsigned long long physArg;
-    struct list_head *freelistp = NULL;
-    struct list_head *busylistp = NULL;
-    struct list_head *registeredlistp;
-    struct list_head *e = NULL;
-    struct list_head *u;
-    struct list_head *unext;
-    struct pool_buffer *entry;
-    struct registered_user *user;
-    phys_addr_t physp;
-    void *virtp;
-    void *virtp_end;
-    dma_addr_t dma = 0;
-    size_t reqsize, align;
-    size_t size = 0;
-    unsigned long long lsize, lreqsize;
-    unsigned long long delta = MAXTYPE(unsigned long long);
-    int pool = -1;
-    int i;
-    int bi;
-    int id;
-    int pool_alloc;
-    struct CMEM_block_struct block;
-    union CMEM_AllocUnion allocDesc;
-    struct device *dev = NULL;
-    struct dma_buf *dmabuf;
-    int ret;
+	unsigned int __user *argp = (unsigned int __user *) args;
+	unsigned long long __user *llargp = (unsigned long long __user *) args;
+	unsigned long virtArg;
+	unsigned long long physArg;
+	struct list_head *freelistp = NULL;
+	struct list_head *busylistp = NULL;
+	struct list_head *registeredlistp;
+	struct list_head *e = NULL;
+	struct list_head *u;
+	struct list_head *unext;
+	struct pool_buffer *entry;
+	struct registered_user *user;
+	phys_addr_t physp;
+	void *virtp;
+	void *virtp_end;
+	dma_addr_t dma = 0;
+	size_t reqsize, align;
+	size_t size = 0;
+	unsigned long long lsize, lreqsize;
+	unsigned long long delta = MAXTYPE(unsigned long long);
+	int pool = -1;
+	int i;
+	int bi;
+	int id;
+	int pool_alloc;
+	struct CMEM_block_struct block;
+	union CMEM_AllocUnion allocDesc;
+	struct device *dev = NULL;
+	struct dma_buf *dmabuf;
+	int ret;
 
-    if (_IOC_TYPE(cmd) != _IOC_TYPE(CMEM_IOCMAGIC)) {
+	if (_IOC_TYPE(cmd) != _IOC_TYPE(CMEM_IOCMAGIC)) {
 	__E("ioctl(): bad command type %#x (should be %#x)\n",
-	    _IOC_TYPE(cmd), _IOC_TYPE(CMEM_IOCMAGIC));
-    }
+		_IOC_TYPE(cmd), _IOC_TYPE(CMEM_IOCMAGIC));
+	}
 
-    switch (cmd & CMEM_IOCCMDMASK) {
-        case CMEM_IOCALLOCHEAP:
-	    if (copy_from_user(&allocDesc, argp, sizeof(allocDesc))) {
-		return -EFAULT;
-	    }
-
-	    size = allocDesc.alloc_heap_inparams.size;
-	    align = allocDesc.alloc_heap_inparams.align;
-	    bi = allocDesc.alloc_heap_inparams.blockid;
-
-	    if (bi == CMEM_CMABLOCKID) {
-		bi = NBLOCKS;
-
-		if (cmem_cma_heapsize == 0) {
-		    __D("no explicit CMEM CMA heap, using global area\n");
-		    dev = cmem_cma_dev_0;
+	switch (cmd & CMEM_IOCCMDMASK) {
+	case CMEM_IOCALLOCHEAP:
+		if (copy_from_user(&allocDesc, argp, sizeof(allocDesc))) {
+			return -EFAULT;
 		}
-		else {
-		    dev = &cmem_cma_dev[heap_pool[bi]];
+
+		size = allocDesc.alloc_heap_inparams.size;
+		align = allocDesc.alloc_heap_inparams.align;
+		bi = allocDesc.alloc_heap_inparams.blockid;
+
+		if (bi == CMEM_CMABLOCKID) {
+			bi = NBLOCKS;
+
+			if (cmem_cma_heapsize == 0) {
+				__D("no explicit CMEM CMA heap, using global area\n");
+				dev = cmem_cma_dev_0;
+			}
+			else {
+				dev = &cmem_cma_dev[heap_pool[bi]];
+			}
 		}
-	    }
 
-            __D("ALLOCHEAP%s ioctl received on heap pool for block %d\n",
-	        cmd & CMEM_CACHED ? "CACHED" : "", bi);
+		__D("ALLOCHEAP%s ioctl received on heap pool for block %d\n",
+		cmd & CMEM_CACHED ? "CACHED" : "", bi);
 
-	    if (bi > NBLOCKS || bi < 0) {
-		__E("ioctl: invalid block id %d, must be < %d\n",
-		    bi, NBLOCKS);
-		return -EINVAL;
-	    }
+		if (bi > NBLOCKS || bi < 0) {
+			__E("ioctl: invalid block id %d, must be < %d\n",
+			bi, NBLOCKS);
+			return -EINVAL;
+		}
 
-	    /* heap_pool[NBLOCKS] (the CMA heap) is always available */
-	    if (bi < NBLOCKS && heap_pool[bi] == -1) {
-		__E("ioctl: no heap available in block %d\n", bi);
-		return -EINVAL;
-	    }
+		/* heap_pool[NBLOCKS] (the CMA heap) is always available */
+		if (bi < NBLOCKS && heap_pool[bi] == -1) {
+			__E("ioctl: no heap available in block %d\n", bi);
+			return -EINVAL;
+		}
 
-	    pool = heap_pool[bi];
+		pool = heap_pool[bi];
 
-	    pool_alloc = 0;
+		pool_alloc = 0;
 alloc:
-	    entry = kmalloc(sizeof(struct pool_buffer), GFP_KERNEL);
-	    if (!entry) {
-		__E("ioctl: failed to kmalloc pool_buffer struct for heap");
+		entry = kmalloc(sizeof(struct pool_buffer), GFP_KERNEL);
+		if (!entry) {
+			__E("ioctl: failed to kmalloc pool_buffer struct for heap");
 
-		return -ENOMEM;
-	    }
+			return -ENOMEM;
+		}
 
-	    if (mutex_lock_interruptible(&cmem_mutex)) {
-		return -ERESTARTSYS;
-	    }
+		if (mutex_lock_interruptible(&cmem_mutex)) {
+			return -ERESTARTSYS;
+		}
 
-	    size = PAGE_ALIGN(size);
+		size = PAGE_ALIGN(size);
 
-	    if (bi == NBLOCKS) {
+		if (bi == NBLOCKS) {
 		virtp = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
 
 #if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
@@ -1544,632 +1544,632 @@ alloc:
 #endif
 		entry->dev = dev;
 		entry->kvirtp = virtp;
-	    }
-	    else {
-		physp = HeapMem_alloc(bi, size, align, ALLOCRUN);
-		entry->kvirtp = NULL;
-		/* set only for test just below here */
-		virtp = (void *)(unsigned int)physp;
-	    }
+		}
+		else {
+			physp = HeapMem_alloc(bi, size, align, ALLOCRUN);
+			entry->kvirtp = NULL;
+			/* set only for test just below here */
+			virtp = (void *)(unsigned int)physp;
+		}
 
-	    if (virtp == NULL) {
-		__E("ioctl: failed to allocate heap buffer of size %#x\n",
-		    size);
+		if (virtp == NULL) {
+			__E("ioctl: failed to allocate heap buffer of size %#x\n",
+			    size);
+
+			mutex_unlock(&cmem_mutex);
+			kfree(entry);
+
+			return -ENOMEM;
+		}
+
+		entry->dma = dma;
+		entry->id = pool;
+		entry->physp = physp;
+		entry->size = size;
+		entry->flags = cmd & ~CMEM_IOCCMDMASK;
+		entry->vma = NULL;
+		INIT_LIST_HEAD(&entry->users);
+
+		busylistp = &p_objs[bi][pool].busylist;
+		list_add_tail(&entry->element, busylistp);
+
+		user = kmalloc(sizeof(struct registered_user), GFP_KERNEL);
+		user->filp = filp;
+		list_add(&user->element, &entry->users);
 
 		mutex_unlock(&cmem_mutex);
-		kfree(entry);
 
-		return -ENOMEM;
-	    }
+		if (pool_alloc) {
+			allocDesc.alloc_pool_outparams.physp = physp;
+			allocDesc.alloc_pool_outparams.size = size;
 
-	    entry->dma = dma;
-	    entry->id = pool;
-	    entry->physp = physp;
-	    entry->size = size;
-	    entry->flags = cmd & ~CMEM_IOCCMDMASK;
-	    entry->vma = NULL;
-	    INIT_LIST_HEAD(&entry->users);
+			if (copy_to_user(argp, &allocDesc, sizeof(allocDesc))) {
+				return -EFAULT;
+			}
+		}
+		else {
+			if (put_user(physp, llargp)) {
+				return -EFAULT;
+			}
+		}
 
-            busylistp = &p_objs[bi][pool].busylist;
-	    list_add_tail(&entry->element, busylistp);
+		__D("ALLOCHEAP%s: allocated %#x size buffer at %#llx (phys address)\n",
+		    cmd & CMEM_CACHED ? "CACHED" : "", (size_t)entry->size,
+		    (unsigned long long)entry->physp);
 
-	    user = kmalloc(sizeof(struct registered_user), GFP_KERNEL);
-	    user->filp = filp;
-	    list_add(&user->element, &entry->users);
+		break;
 
-            mutex_unlock(&cmem_mutex);
+		/*
+		 * argp contains a pointer to an alloc descriptor coming in, and the
+		 * physical address and size of the allocated buffer when returning.
+		 */
+		case CMEM_IOCALLOC:
+		if (copy_from_user(&allocDesc, argp, sizeof(allocDesc))) {
+			return -EFAULT;
+		}
 
-	    if (pool_alloc) {
-		allocDesc.alloc_pool_outparams.physp = physp;
-		allocDesc.alloc_pool_outparams.size = size;
+		pool = allocDesc.alloc_pool_inparams.poolid;
+		bi = allocDesc.alloc_pool_inparams.blockid;
+
+		if (bi == CMEM_CMABLOCKID) {
+			bi = NBLOCKS;
+		}
+
+		__D("ALLOC%s ioctl received on pool %d for memory block %d\n",
+		    cmd & CMEM_CACHED ? "CACHED" : "", pool, bi);
+
+		if (bi > NBLOCKS || bi < 0) {
+			__E("ioctl: invalid block id %d, must be < %d\n",
+			    bi, NBLOCKS);
+			return -EINVAL;
+		}
+
+		if (pool >= npools[bi] || pool < 0) {
+			__E("ALLOC%s: invalid pool (%d) passed.\n",
+			    cmd & CMEM_CACHED ? "CACHED" : "", pool);
+			return -EINVAL;
+		}
+
+		if (bi == NBLOCKS) {
+			lsize = p_objs[bi][pool].size;
+			dev = &cmem_cma_dev[pool];
+				align = 0;
+				pool_alloc = 1;
+
+			goto alloc;
+		}
+
+		busylistp = &p_objs[bi][pool].busylist;
+		freelistp = &p_objs[bi][pool].freelist;
+
+		if (mutex_lock_interruptible(&cmem_mutex)) {
+			return -ERESTARTSYS;
+		}
+
+		e = freelistp->next;
+		if (e == freelistp) {
+			__E("ALLOC%s: No free buffers available for pool %d\n",
+			    cmd & CMEM_CACHED ? "CACHED" : "", pool);
+			mutex_unlock(&cmem_mutex);
+			return -ENOMEM;
+		}
+		entry = list_entry(e, struct pool_buffer, element);
+
+		allocDesc.alloc_pool_outparams.physp = entry->physp;
+		allocDesc.alloc_pool_outparams.size = p_objs[bi][pool].size;
 
 		if (copy_to_user(argp, &allocDesc, sizeof(allocDesc))) {
-		    return -EFAULT;
+			mutex_unlock(&cmem_mutex);
+			return -EFAULT;
 		}
-	    }
-	    else {
-		if (put_user(physp, llargp)) {
-		    return -EFAULT;
-		}
-	    }
 
-            __D("ALLOCHEAP%s: allocated %#x size buffer at %#llx (phys address)\n",
-	        cmd & CMEM_CACHED ? "CACHED" : "", (size_t)entry->size,
-	        (unsigned long long)entry->physp);
+		entry->flags = cmd & ~CMEM_IOCCMDMASK;
 
-	    break;
+		list_del_init(e);
+		list_add(e, busylistp);
 
-        /*
-         * argp contains a pointer to an alloc descriptor coming in, and the
-         * physical address and size of the allocated buffer when returning.
-         */
-        case CMEM_IOCALLOC:
-	    if (copy_from_user(&allocDesc, argp, sizeof(allocDesc))) {
-                return -EFAULT;
-            }
+		user = kmalloc(sizeof(struct registered_user), GFP_KERNEL);
+		user->filp = filp;
+		list_add(&user->element, &entry->users);
 
-	    pool = allocDesc.alloc_pool_inparams.poolid;
-	    bi = allocDesc.alloc_pool_inparams.blockid;
-
-	    if (bi == CMEM_CMABLOCKID) {
-		bi = NBLOCKS;
-	    }
-
-            __D("ALLOC%s ioctl received on pool %d for memory block %d\n",
-	        cmd & CMEM_CACHED ? "CACHED" : "", pool, bi);
-
-	    if (bi > NBLOCKS || bi < 0) {
-		__E("ioctl: invalid block id %d, must be < %d\n",
-		    bi, NBLOCKS);
-		return -EINVAL;
-	    }
-
-            if (pool >= npools[bi] || pool < 0) {
-                __E("ALLOC%s: invalid pool (%d) passed.\n",
-		    cmd & CMEM_CACHED ? "CACHED" : "", pool);
-                return -EINVAL;
-            }
-
-	    if (bi == NBLOCKS) {
-		lsize = p_objs[bi][pool].size;
-		dev = &cmem_cma_dev[pool];
-		align = 0;
-		pool_alloc = 1;
-
-		goto alloc;
-	    }
-
-            busylistp = &p_objs[bi][pool].busylist;
-	    freelistp = &p_objs[bi][pool].freelist;
-
-	    if (mutex_lock_interruptible(&cmem_mutex)) {
-		return -ERESTARTSYS;
-	    }
-
-	    e = freelistp->next;
-	    if (e == freelistp) {
-		__E("ALLOC%s: No free buffers available for pool %d\n",
-		    cmd & CMEM_CACHED ? "CACHED" : "", pool);
 		mutex_unlock(&cmem_mutex);
-		return -ENOMEM;
-	    }
-	    entry = list_entry(e, struct pool_buffer, element);
 
-	    allocDesc.alloc_pool_outparams.physp = entry->physp;
-	    allocDesc.alloc_pool_outparams.size = p_objs[bi][pool].size;
-
-	    if (copy_to_user(argp, &allocDesc, sizeof(allocDesc))) {
-                mutex_unlock(&cmem_mutex);
-                return -EFAULT;
-            }
-
-	    entry->flags = cmd & ~CMEM_IOCCMDMASK;
-
-            list_del_init(e);
-            list_add(e, busylistp);
-
-	    user = kmalloc(sizeof(struct registered_user), GFP_KERNEL);
-	    user->filp = filp;
-	    list_add(&user->element, &entry->users);
-
-            mutex_unlock(&cmem_mutex);
-
-            __D("ALLOC%s: allocated a buffer at %#llx (phys address)\n",
-	        cmd & CMEM_CACHED ? "CACHED" : "",
-	        (unsigned long long)entry->physp);
+		__D("ALLOC%s: allocated a buffer at %#llx (phys address)\n",
+		    cmd & CMEM_CACHED ? "CACHED" : "",
+		    (unsigned long long)entry->physp);
 
 #ifdef __DEBUG
-            dump_lists(bi, pool);
+		dump_lists(bi, pool);
 #endif
-            break;
+		break;
 
-        /*
-         * argp contains either the user virtual address or the physical
+	/*
+	 * argp contains either the user virtual address or the physical
 	 * address of the buffer to free coming in, and contains the pool
 	 * where it was freed from and the size of the block on return.
-         */
-        case CMEM_IOCFREE:
-            __D("FREE%s%s ioctl received.\n",
-	        cmd & CMEM_HEAP ? "HEAP" : "",
-	        cmd & CMEM_PHYS ? "PHYS" : "");
+	 */
+	case CMEM_IOCFREE:
+		__D("FREE%s%s ioctl received.\n",
+		    cmd & CMEM_HEAP ? "HEAP" : "",
+		    cmd & CMEM_PHYS ? "PHYS" : "");
 
-	    if (!(cmd & CMEM_PHYS)) {
+		if (!(cmd & CMEM_PHYS)) {
+			if (get_user(virtArg, argp)) {
+				return -EFAULT;
+			}
+
+			physp = get_phys((void *)virtArg);
+
+			if (physp == ~(0LL)) {
+				__E("FREE%s: Failed to convert virtual %#lx to physical\n",
+				    cmd & CMEM_HEAP ? "HEAP" : "", virtArg);
+				return -EFAULT;
+			}
+
+			virtp = (void *)virtArg;
+
+			__D("FREE%s: translated 0x%p user virtual to %#llx physical\n",
+			    cmd & CMEM_HEAP ? "HEAP" : "",
+			    virtp, (unsigned long long)physp);
+			}
+			else {
+				virtp = 0L;	/* silence the compiler warning */
+				if (copy_from_user(&physArg, llargp,
+				    sizeof(unsigned long long))) {
+				return -EFAULT;
+			}
+			physp = physArg;
+		}
+
+		if (mutex_lock_interruptible(&cmem_mutex)) {
+		return -ERESTARTSYS;
+		}
+
+		size = 0;
+
+		entry = find_busy_entry(physp, &pool, &e, &bi, NULL);
+		if (entry) {
+			/* record values in case entry gets kfree()'d for CMEM_HEAP */
+			id = entry->id;
+			size = (size_t)entry->size;
+
+			registeredlistp = &entry->users;
+			u = registeredlistp->next;
+			while (u != registeredlistp) {
+				unext = u->next;
+
+				user = list_entry(u, struct registered_user, element);
+				if (user->filp == filp) {
+					__D("FREE%s%s: Removing file 0x%p from user list of buffer %#llx...\n",
+				    	    cmd & CMEM_HEAP ? "HEAP" : "",
+					    cmd & CMEM_PHYS ? "PHYS" : "",
+					    filp, (unsigned long long)physp);
+
+					list_del(u);
+					kfree(user);
+
+					break;
+				}
+
+				u = unext;
+			}
+
+			if (u == registeredlistp) {
+				__E("FREE%s%s: Not a registered user of physical buffer %#llx\n",
+				cmd & CMEM_HEAP ? "HEAP" : "",
+				cmd & CMEM_PHYS ? "PHYS" : "",
+				(unsigned long long)physp);
+				mutex_unlock(&cmem_mutex);
+
+				return -EFAULT;
+			}
+
+			if (registeredlistp->next == registeredlistp) {
+				/* no more registered users, free buffer */
+				if (bi == NBLOCKS || pool == heap_pool[bi]) {
+					if (!(cmd & CMEM_PHYS) && bi != NBLOCKS) {
+						/*
+						 * Need to invalidate possible cached entry for
+						 * user's virt addr since the kernel is about to
+						 * do a non-cached write to the entry in
+						 * HeapMem_free()
+						 */
+						virtp_end = virtp + size;
+						outer_inv_range(physp, physp + size);
+						dmac_map_area(virtp, size, DMA_FROM_DEVICE);
+						__D("FREEHEAP: invalidated user virtual "
+						    "0x%p -> 0x%p\n", virtp, virtp_end);
+					}
+
+					if (bi == NBLOCKS) {
+						dma_free_coherent(entry->dev, (size_t)entry->size,
+							  	  entry->kvirtp, entry->dma);
+					}
+					else {
+						HeapMem_free(bi, entry->physp, (size_t)entry->size);
+						if (entry->vma) {
+							free_vm_area(entry->vma);
+						}
+					}
+					list_del(e);
+					kfree(entry);
+				}
+				else {
+					list_del_init(e);
+					list_add(e, &p_objs[bi][pool].freelist);
+				}
+
+				__D("FREE%s%s: Successfully freed buffer %d from pool %d\n",
+				    cmd & CMEM_HEAP ? "HEAP" : "",
+				    cmd & CMEM_PHYS ? "PHYS" : "", id, pool);
+			}
+		}
+
+		mutex_unlock(&cmem_mutex);
+
+		if (!entry) {
+			__E("Failed to free memory at %#llx\n",
+			    (unsigned long long)physp);
+			return -EFAULT;
+		}
+
+#ifdef __DEBUG
+		dump_lists(bi, pool);
+#endif
+		if (cmd & CMEM_PHYS) {
+			__D("FREE%sPHYS: returning\n", cmd & CMEM_HEAP ? "HEAP" : "");
+		}
+		else {
+			if (pool == heap_pool[bi]) {
+				allocDesc.free_outparams.size = size;
+			}
+			else {
+				allocDesc.free_outparams.size = p_objs[bi][pool].size;
+			}
+			allocDesc.free_outparams.poolid = pool;
+				if (copy_to_user(argp, &allocDesc, sizeof(allocDesc))) {
+				return -EFAULT;
+			}
+
+			__D("FREE%s%s: returning size 0x%x, poolid %d\n",
+			cmd & CMEM_HEAP ? "HEAP" : "",
+			cmd & CMEM_PHYS ? "PHYS" : "",
+			allocDesc.free_outparams.size,
+			allocDesc.free_outparams.poolid);
+		}
+
+		break;
+
+	/*
+	 * argp contains the user virtual address of the buffer to translate
+	 * coming in, and the translated physical address on return.
+	 */
+	case CMEM_IOCGETPHYS:
+		__D("GETPHYS ioctl received.\n");
 		if (get_user(virtArg, argp)) {
-		    return -EFAULT;
+			return -EFAULT;
 		}
 
 		physp = get_phys((void *)virtArg);
 
 		if (physp == ~(0LL)) {
-		    __E("FREE%s: Failed to convert virtual %#lx to physical\n",
-			cmd & CMEM_HEAP ? "HEAP" : "", virtArg);
-		    return -EFAULT;
+			__E("GETPHYS: Failed to convert virtual %#lx to physical.\n",
+				virtArg);
+			return -EFAULT;
 		}
 
-		virtp = (void *)virtArg;
-
-		__D("FREE%s: translated 0x%p user virtual to %#llx physical\n",
-		    cmd & CMEM_HEAP ? "HEAP" : "",
-		    virtp, (unsigned long long)physp);
-	    }
-	    else {
-		virtp = 0L;    /* silence the compiler warning */
-		if (copy_from_user(&physArg, llargp,
-		                   sizeof(unsigned long long))) {
-		    return -EFAULT;
-		}
-		physp = physArg;
-	    }
-
-	    if (mutex_lock_interruptible(&cmem_mutex)) {
-		return -ERESTARTSYS;
-	    }
-
-	    size = 0;
-
-	    entry = find_busy_entry(physp, &pool, &e, &bi, NULL);
-	    if (entry) {
-		/* record values in case entry gets kfree()'d for CMEM_HEAP */
-		id = entry->id;
-		size = (size_t)entry->size;
-
-		registeredlistp = &entry->users;
-		u = registeredlistp->next;
-		while (u != registeredlistp) {
-		    unext = u->next;
-
-		    user = list_entry(u, struct registered_user, element);
-		    if (user->filp == filp) {
-			__D("FREE%s%s: Removing file 0x%p from user list of buffer %#llx...\n",
-			    cmd & CMEM_HEAP ? "HEAP" : "",
-			    cmd & CMEM_PHYS ? "PHYS" : "",
-			    filp, (unsigned long long)physp);
-
-			list_del(u);
-			kfree(user);
-
-			break;
-		    }
-
-		    u = unext;
+		if (put_user(physp, llargp)) {
+			return -EFAULT;
 		}
 
-		if (u == registeredlistp) {
-		    __E("FREE%s%s: Not a registered user of physical buffer %#llx\n",
-		        cmd & CMEM_HEAP ? "HEAP" : "",
-		        cmd & CMEM_PHYS ? "PHYS" : "",
-		        (unsigned long long)physp);
-		    mutex_unlock(&cmem_mutex);
+		__D("GETPHYS: returning %#llx\n", (unsigned long long)physp);
+		break;
 
-		    return -EFAULT;
+	/*
+	 * argp contains the pool to query for size coming in, and the size
+	 * of the pool on return.
+	 */
+	case CMEM_IOCGETSIZE:
+		__D("GETSIZE ioctl received\n");
+		if (copy_from_user(&allocDesc, argp, sizeof(allocDesc))) {
+			return -EFAULT;
 		}
 
-		if (registeredlistp->next == registeredlistp) {
-		    /* no more registered users, free buffer */
-		    if (bi == NBLOCKS || pool == heap_pool[bi]) {
-			if (!(cmd & CMEM_PHYS) && bi != NBLOCKS) {
-			    /*
-			     * Need to invalidate possible cached entry for
-			     * user's virt addr since the kernel is about to
-			     * do a non-cached write to the entry in
-			     * HeapMem_free()
-			     */
-			    virtp_end = virtp + size;
-			    outer_inv_range(physp, physp + size);
-			    dmac_map_area(virtp, size, DMA_FROM_DEVICE);
-			    __D("FREEHEAP: invalidated user virtual "
-			        "0x%p -> 0x%p\n", virtp, virtp_end);
-			}
+		pool = allocDesc.get_size_inparams.poolid;
+		bi = allocDesc.get_size_inparams.blockid;
 
-			if (bi == NBLOCKS) {
-			    dma_free_coherent(entry->dev, (size_t)entry->size,
-			                      entry->kvirtp, entry->dma);
-			}
-			else {
-				HeapMem_free(bi, entry->physp, (size_t)entry->size);
-				if (entry->vma) {
-					free_vm_area(entry->vma);
+		if (bi == CMEM_CMABLOCKID) {
+		bi = NBLOCKS;
+		}
+
+		if (bi > NBLOCKS || bi < 0) {
+		__E("ioctl: invalid block id %d, must be < %d\n",
+			bi, NBLOCKS);
+		return -EINVAL;
+		}
+
+		if (pool >= npools[bi] || pool < 0) {
+			__E("GETSIZE: invalid pool (%d) passed.\n", pool);
+			return -EINVAL;
+		}
+
+		if (put_user(p_objs[bi][pool].size, argp)) {
+			return -EFAULT;
+		}
+		__D("GETSIZE returning %#llx\n", p_objs[bi][pool].size);
+		break;
+
+	/*
+	 * argp contains the requested pool buffers size coming in, and the
+	 * pool id (index) on return.
+	 */
+	case CMEM_IOCGETPOOL:
+		__D("GETPOOL ioctl received.\n");
+		if (copy_from_user(&allocDesc, argp, sizeof(allocDesc))) {
+			return -EFAULT;
+		}
+
+		lreqsize = allocDesc.get_pool_inparams.size;
+		bi = allocDesc.get_pool_inparams.blockid;
+
+		if (bi == CMEM_CMABLOCKID) {
+			bi = NBLOCKS;
+		}
+
+		if (bi > NBLOCKS || bi < 0) {
+			__E("ioctl: invalid block id %d, must be < %d\n",
+			    bi, NBLOCKS);
+			return -EINVAL;
+		}
+
+		if (mutex_lock_interruptible(&cmem_mutex)) {
+			return -ERESTARTSYS;
+		}
+
+		__D("GETPOOL: Trying to find a pool to fit size %#llx\n", lreqsize);
+		for (i = 0; i < npools[bi]; i++) {
+			lsize = p_objs[bi][i].size;
+			freelistp = &p_objs[bi][i].freelist;
+
+			__D("GETPOOL: size (%#llx) > reqsize (%#llx)?\n",
+			    lsize, lreqsize);
+			if (lsize >= lreqsize) {
+				__D("GETPOOL: delta (%#llx) < olddelta (%#llx)?\n",
+				    lsize - lreqsize, delta);
+				if ((lsize - lreqsize) < delta) {
+					if (bi < NBLOCKS) {
+						if (!list_empty(freelistp)) {
+							delta = lsize - lreqsize;
+							pool = i;
+							__D("GETPOOL: Found a best fit delta %#llx in pool %d\n",
+							    delta, pool);
+						}
+					}
+					else {
+						delta = lsize - lreqsize;
+						pool = i;
+						__D("GETPOOL: Found a best fit delta %#llx in CMA block\n",
+						    delta);
+					}
 				}
 			}
-			list_del(e);
-			kfree(entry);
-		    }
-		    else {
-			list_del_init(e);
-			list_add(e, &p_objs[bi][pool].freelist);
-		    }
-
-		    __D("FREE%s%s: Successfully freed buffer %d from pool %d\n",
-			cmd & CMEM_HEAP ? "HEAP" : "",
-			cmd & CMEM_PHYS ? "PHYS" : "", id, pool);
 		}
-	    }
 
-            mutex_unlock(&cmem_mutex);
+		if (pool == -1 && heap_pool[bi] != -1) {
+			if (useHeapIfPoolUnavailable) {
+				/* no pool buffer available, try heap */
 
-            if (!entry) {
-                __E("Failed to free memory at %#llx\n",
-		    (unsigned long long)physp);
-                return -EFAULT;
-            }
+				reqsize = lreqsize;
+				physp = HeapMem_alloc(bi, reqsize, HEAP_ALIGN, DRYRUN);
+				if (physp != 0) {
+					/*
+					 * Indicate heap pool with magic negative value.
+					 * -1 indicates no pool and no heap.
+					 * -2 indicates no pool but heap available and allowed.
+					 */
+					pool = -2;
 
-#ifdef __DEBUG
-            dump_lists(bi, pool);
-#endif
-	    if (cmd & CMEM_PHYS) {
-		__D("FREE%sPHYS: returning\n", cmd & CMEM_HEAP ? "HEAP" : "");
-	    }
-	    else {
-		    if (pool == heap_pool[bi]) {
-			allocDesc.free_outparams.size = size;
-		    }
-		    else {
-			allocDesc.free_outparams.size = p_objs[bi][pool].size;
-		    }
-		    allocDesc.free_outparams.poolid = pool;
-		    if (copy_to_user(argp, &allocDesc, sizeof(allocDesc))) {
+					__D("GETPOOL: no pool-based buffer available, "
+					    "returning heap \"pool\" instead (due to config "
+					    "override)\n");
+				}
+			}
+		}
+
+		mutex_unlock(&cmem_mutex);
+
+		if (pool == -1) {
+			__E("Failed to find a pool which fits %#llx\n", lreqsize);
+
+			return -ENOMEM;
+		}
+
+		if (put_user(pool, argp)) {
 			return -EFAULT;
-		    }
-
-		    __D("FREE%s%s: returning size 0x%x, poolid %d\n",
-			cmd & CMEM_HEAP ? "HEAP" : "",
-			cmd & CMEM_PHYS ? "PHYS" : "",
-			allocDesc.free_outparams.size,
-			allocDesc.free_outparams.poolid);
-	    }
-
-            break;
-
-        /*
-         * argp contains the user virtual address of the buffer to translate
-         * coming in, and the translated physical address on return.
-         */
-        case CMEM_IOCGETPHYS:
-            __D("GETPHYS ioctl received.\n");
-            if (get_user(virtArg, argp)) {
-                return -EFAULT;
-            }
-
-            physp = get_phys((void *)virtArg);
-
-            if (physp == ~(0LL)) {
-                __E("GETPHYS: Failed to convert virtual %#lx to physical.\n",
-                    virtArg);
-                return -EFAULT;
-            }
-
-            if (put_user(physp, llargp)) {
-                return -EFAULT;
-            }
-
-            __D("GETPHYS: returning %#llx\n", (unsigned long long)physp);
-            break;
-
-        /*
-         * argp contains the pool to query for size coming in, and the size
-         * of the pool on return.
-         */
-        case CMEM_IOCGETSIZE:
-            __D("GETSIZE ioctl received\n");
-	    if (copy_from_user(&allocDesc, argp, sizeof(allocDesc))) {
-                return -EFAULT;
-            }
-
-	    pool = allocDesc.get_size_inparams.poolid;
-	    bi = allocDesc.get_size_inparams.blockid;
-
-	    if (bi == CMEM_CMABLOCKID) {
-		bi = NBLOCKS;
-	    }
-
-	    if (bi > NBLOCKS || bi < 0) {
-		__E("ioctl: invalid block id %d, must be < %d\n",
-		    bi, NBLOCKS);
-		return -EINVAL;
-	    }
-
-            if (pool >= npools[bi] || pool < 0) {
-                __E("GETSIZE: invalid pool (%d) passed.\n", pool);
-                return -EINVAL;
-            }
-
-            if (put_user(p_objs[bi][pool].size, argp)) {
-                return -EFAULT;
-            }
-            __D("GETSIZE returning %#llx\n", p_objs[bi][pool].size);
-            break;
-
-        /*
-         * argp contains the requested pool buffers size coming in, and the
-         * pool id (index) on return.
-         */
-        case CMEM_IOCGETPOOL:
-            __D("GETPOOL ioctl received.\n");
-	    if (copy_from_user(&allocDesc, argp, sizeof(allocDesc))) {
-                return -EFAULT;
-            }
-
-	    lreqsize = allocDesc.get_pool_inparams.size;
-	    bi = allocDesc.get_pool_inparams.blockid;
-
-	    if (bi == CMEM_CMABLOCKID) {
-		bi = NBLOCKS;
-	    }
-
-	    if (bi > NBLOCKS || bi < 0) {
-		__E("ioctl: invalid block id %d, must be < %d\n",
-		    bi, NBLOCKS);
-		return -EINVAL;
-	    }
-
-	    if (mutex_lock_interruptible(&cmem_mutex)) {
-		return -ERESTARTSYS;
-	    }
-
-            __D("GETPOOL: Trying to find a pool to fit size %#llx\n", lreqsize);
-            for (i = 0; i < npools[bi]; i++) {
-                lsize = p_objs[bi][i].size;
-                freelistp = &p_objs[bi][i].freelist;
-
-                __D("GETPOOL: size (%#llx) > reqsize (%#llx)?\n",
-		    lsize, lreqsize);
-                if (lsize >= lreqsize) {
-                    __D("GETPOOL: delta (%#llx) < olddelta (%#llx)?\n",
-                        lsize - lreqsize, delta);
-                    if ((lsize - lreqsize) < delta) {
-                        if (bi < NBLOCKS) {
-			    if (!list_empty(freelistp)) {
-				delta = lsize - lreqsize;
-				pool = i;
-				__D("GETPOOL: Found a best fit delta %#llx in pool %d\n",
-				    delta, pool);
-			    }
-                        }
-			else {
-			    delta = lsize - lreqsize;
-			    pool = i;
-			    __D("GETPOOL: Found a best fit delta %#llx in CMA block\n",
-				    delta);
-                        }
-                    }
-                }
-            }
-
-	    if (pool == -1 && heap_pool[bi] != -1) {
-		if (useHeapIfPoolUnavailable) {
-		    /* no pool buffer available, try heap */
-
-		    reqsize = lreqsize;
-		    physp = HeapMem_alloc(bi, reqsize, HEAP_ALIGN, DRYRUN);
-		    if (physp != 0) {
-			/*
-			 * Indicate heap pool with magic negative value.
-			 * -1 indicates no pool and no heap.
-			 * -2 indicates no pool but heap available and allowed.
-			 */
-			pool = -2;
-
-			__D("GETPOOL: no pool-based buffer available, "
-			    "returning heap \"pool\" instead (due to config "
-			    "override)\n");
-		    }
 		}
-	    }
+		__D("GETPOOL: returning %d\n", pool);
+		break;
 
-            mutex_unlock(&cmem_mutex);
+	case CMEM_IOCCACHEWBINVALL:
+		flush_cache_all();
+		__D("CACHEWBINVALL: flush all cache\n");
 
-	    if (pool == -1) {
-		__E("Failed to find a pool which fits %#llx\n", lreqsize);
+		break;
 
-		return -ENOMEM;
-            }
+	case CMEM_IOCCACHE:
+		__D("CACHE%s%s ioctl received.\n",
+		    cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "");
 
-            if (put_user(pool, argp)) {
-                return -EFAULT;
-            }
-            __D("GETPOOL: returning %d\n", pool);
-            break;
-
-        case CMEM_IOCCACHEWBINVALL:
-	    flush_cache_all();
-	    __D("CACHEWBINVALL: flush all cache\n");
-
-	    break;
-
-        case CMEM_IOCCACHE:
-            __D("CACHE%s%s ioctl received.\n",
-	        cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "");
-
-	    if (copy_from_user(&block, argp, sizeof(block))) {
-		return -EFAULT;
-	    }
-	    virtp = block.addr;
-	    virtp_end = virtp + block.size;
+		if (copy_from_user(&block, argp, sizeof(block))) {
+			return -EFAULT;
+		}
+		virtp = block.addr;
+		virtp_end = virtp + block.size;
 
 #ifdef CHECK_FOR_ALLOCATED_BUFFER
-            physp = get_phys(virtp);
-            if (physp == ~(0LL)) {
-                __E("CACHE%s%s: Failed to convert virtual 0x%p to physical\n",
-		    cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "",
-		    virtp);
-                return -EFAULT;
-            }
+		physp = get_phys(virtp);
+		if (physp == ~(0LL)) {
+			__E("CACHE%s%s: Failed to convert virtual 0x%p to physical\n",
+			    cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "",
+			    virtp);
+			return -EFAULT;
+		}
 
-            __D("CACHE%s%s: translated 0x%p user virtual to %#lx physical\n",
-	        cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "",
-                virtp, physp);
+		__D("CACHE%s%s: translated 0x%p user virtual to %#lx physical\n",
+		    cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "",
+		    virtp, physp);
 
-	    if (mutex_lock_interruptible(&cmem_mutex)) {
-		return -ERESTARTSYS;
-	    }
-	    entry = find_busy_entry(physp, &pool, &e, &bi, &block.size);
-            mutex_unlock(&cmem_mutex);
-	    if (!entry) {
-                __E("CACHE%s%s: Failed to find allocated buffer at virtual 0x%p\n",
-		    cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "",
-		    virtp);
-                return -ENXIO;
-	    }
-            if (!(entry->flags & CMEM_CACHED)) {
-                __E("CACHE%s%s: virtual buffer 0x%p not cached\n",
-		    cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "",
-		    virtp);
-                return -EINVAL;
-	    }
+		if (mutex_lock_interruptible(&cmem_mutex)) {
+			return -ERESTARTSYS;
+		}
+		entry = find_busy_entry(physp, &pool, &e, &bi, &block.size);
+		mutex_unlock(&cmem_mutex);
+		if (!entry) {
+			__E("CACHE%s%s: Failed to find allocated buffer at virtual 0x%p\n",
+			    cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "",
+			    virtp);
+			return -ENXIO;
+		}
+		if (!(entry->flags & CMEM_CACHED)) {
+			__E("CACHE%s%s: virtual buffer 0x%p not cached\n",
+			    cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "",
+			    virtp);
+			return -EINVAL;
+		}
 #endif
 
 #ifdef USE_MMAPSEM
-	    __D("CACHE%s%s: acquiring mmap_sem ...\n",
-	        cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "");
-	    down_write(&current->mm->mmap_sem);
+		__D("CACHE%s%s: acquiring mmap_sem ...\n",
+		    cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "");
+		down_write(&current->mm->mmap_sem);
 #endif
 
-	    physp = get_phys(virtp);
+		physp = get_phys(virtp);
 
-	    switch (cmd & ~CMEM_IOCMAGIC) {
-	      case CMEM_IOCCACHEWB:
-		dmac_map_area(virtp, block.size, DMA_TO_DEVICE);
-		outer_clean_range(physp, physp + block.size);
+		switch (cmd & ~CMEM_IOCMAGIC) {
+		case CMEM_IOCCACHEWB:
+			dmac_map_area(virtp, block.size, DMA_TO_DEVICE);
+			outer_clean_range(physp, physp + block.size);
 
-		__D("CACHEWB: cleaned user virtual 0x%p -> 0x%p\n",
-		       virtp, virtp_end);
+			__D("CACHEWB: cleaned user virtual 0x%p -> 0x%p\n",
+			    virtp, virtp_end);
 
-		break;
+			break;
 
-	      case CMEM_IOCCACHEINV:
-		outer_inv_range(physp, physp + block.size);
-		dmac_map_area(virtp, block.size, DMA_FROM_DEVICE);
+		case CMEM_IOCCACHEINV:
+			outer_inv_range(physp, physp + block.size);
+			dmac_map_area(virtp, block.size, DMA_FROM_DEVICE);
 
-		__D("CACHEINV: invalidated user virtual 0x%p -> 0x%p\n",
-		       virtp, virtp_end);
+			__D("CACHEINV: invalidated user virtual 0x%p -> 0x%p\n",
+			    virtp, virtp_end);
 
-		break;
+			break;
 
-	      case CMEM_IOCCACHEWBINV:
-		dmac_map_area(virtp, block.size, DMA_BIDIRECTIONAL);
-		outer_flush_range(physp, physp + block.size);
+		case CMEM_IOCCACHEWBINV:
+			dmac_map_area(virtp, block.size, DMA_BIDIRECTIONAL);
+			outer_flush_range(physp, physp + block.size);
 
-		__D("CACHEWBINV: flushed user virtual 0x%p -> 0x%p\n",
-		       virtp, virtp_end);
+			__D("CACHEWBINV: flushed user virtual 0x%p -> 0x%p\n",
+			    virtp, virtp_end);
 
-		break;
-	    }
+			break;
+		}
 
 #ifdef USE_MMAPSEM
-	    __D("CACHE%s%s: releasing mmap_sem ...\n",
-	        cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "");
-	    up_write(&current->mm->mmap_sem);
+		__D("CACHE%s%s: releasing mmap_sem ...\n",
+		    cmd & CMEM_WB ? "WB" : "", cmd & CMEM_INV ? "INV" : "");
+		up_write(&current->mm->mmap_sem);
 #endif
 
-	    break;
+		break;
 
-        case CMEM_IOCGETVERSION:
-            __D("GETVERSION ioctl received, returning %#x.\n", version);
+	case CMEM_IOCGETVERSION:
+		__D("GETVERSION ioctl received, returning %#x.\n", version);
 
-            if (put_user(version, argp)) {
-                return -EFAULT;
-            }
+		if (put_user(version, argp)) {
+			return -EFAULT;
+		}
 
-	    break;
+		break;
 
-        case CMEM_IOCGETBLOCK:
-            __D("GETBLOCK ioctl received.\n");
+	case CMEM_IOCGETBLOCK:
+		__D("GETBLOCK ioctl received.\n");
 
-	    if (copy_from_user(&allocDesc, argp, sizeof(allocDesc))) {
-                return -EFAULT;
-            }
+		if (copy_from_user(&allocDesc, argp, sizeof(allocDesc))) {
+			return -EFAULT;
+		}
 
-	    bi = allocDesc.blockid;
-	    if (bi >= nblocks || bi < 0) {
-		__E("GETBLOCK: invalid block ID %d\n", bi);
+		bi = allocDesc.blockid;
+		if (bi >= nblocks || bi < 0) {
+			__E("GETBLOCK: invalid block ID %d\n", bi);
 
-		return -EINVAL;
-	    }
+			return -EINVAL;
+		}
 
-	    allocDesc.get_block_outparams.physp = block_start[bi];
-	    allocDesc.get_block_outparams.size = block_end[bi] -
-	                                         block_start[bi];
+		allocDesc.get_block_outparams.physp = block_start[bi];
+		allocDesc.get_block_outparams.size = block_end[bi] -
+						     block_start[bi];
 
-            __D("GETBLOCK: returning phys base "
-	        "%#llx, size %#llx.\n", allocDesc.get_block_outparams.physp,
-                allocDesc.get_block_outparams.size);
+		__D("GETBLOCK: returning phys base "
+		    "%#llx, size %#llx.\n", allocDesc.get_block_outparams.physp,
+		    allocDesc.get_block_outparams.size);
 
-	    if (copy_to_user(argp, &allocDesc, sizeof(allocDesc))) {
-                return -EFAULT;
-            }
+		if (copy_to_user(argp, &allocDesc, sizeof(allocDesc))) {
+			return -EFAULT;
+		}
 
-	    break;
+		break;
 
-        case CMEM_IOCGETNUMBLOCKS:
-            __D("GETNUMBLOCKS ioctl received, returning %d.\n", nblocks);
+	case CMEM_IOCGETNUMBLOCKS:
+		__D("GETNUMBLOCKS ioctl received, returning %d.\n", nblocks);
 
-            if (put_user(nblocks, argp)) {
-                return -EFAULT;
-            }
+		if (put_user(nblocks, argp)) {
+			return -EFAULT;
+		}
 
-	    break;
+		break;
 
-        case CMEM_IOCREGUSER:
-            __D("REGUSER ioctl received.\n");
+	case CMEM_IOCREGUSER:
+		__D("REGUSER ioctl received.\n");
 
-	    if (copy_from_user(&physArg, llargp, sizeof(unsigned long long))) {
-		return -EFAULT;
-	    }
-	    physp = physArg;
+		if (copy_from_user(&physArg, llargp, sizeof(unsigned long long))) {
+			return -EFAULT;
+		}
+		physp = physArg;
 
-	    if (mutex_lock_interruptible(&cmem_mutex)) {
-		return -ERESTARTSYS;
-	    }
+		if (mutex_lock_interruptible(&cmem_mutex)) {
+			return -ERESTARTSYS;
+		}
 
-	    entry = find_busy_entry(physp, &pool, &e, &bi, NULL);
-	    if (entry) {
-		/*
-		 * Should we check if the "current" process is already on
-		 * the list and return error if so?  Or should we just
-		 * silently not put it on the list twice and return success?
-		 * Or should we put it on the list a second time, which seems
-		 * to be OK to do and will require being removed from the
-		 * list twice?  So many questions...
-		 *
-		 * The code below, lacking the test, will put a process on
-		 * the list multiple times (every time IOCREGUSER is called).
-		 */
-		user = kmalloc(sizeof(struct registered_user), GFP_KERNEL);
-		user->filp = filp;
-		list_add(&user->element, &entry->users);
-	    }
+		entry = find_busy_entry(physp, &pool, &e, &bi, NULL);
+		if (entry) {
+			/*
+			 * Should we check if the "current" process is already on
+			 * the list and return error if so?  Or should we just
+			 * silently not put it on the list twice and return success?
+			 * Or should we put it on the list a second time, which seems
+			 * to be OK to do and will require being removed from the
+			 * list twice?  So many questions...
+			 *
+			 * The code below, lacking the test, will put a process on
+			 * the list multiple times (every time IOCREGUSER is called).
+			 */
+			user = kmalloc(sizeof(struct registered_user), GFP_KERNEL);
+			user->filp = filp;
+			list_add(&user->element, &entry->users);
+		}
 
-            mutex_unlock(&cmem_mutex);
+		mutex_unlock(&cmem_mutex);
 
-            if (!entry) {
-                return -EFAULT;
-            }
+		if (!entry) {
+			return -EFAULT;
+		}
 
-            if (put_user(entry->size, argp)) {
-                return -EFAULT;
-            }
+		if (put_user(entry->size, argp)) {
+			return -EFAULT;
+			}
 
-	    break;
+		break;
 
 	case CMEM_IOCEXPORTDMABUF:
 	{
@@ -2231,85 +2231,85 @@ alloc:
 		}
 		mutex_unlock(&cmem_mutex);
 	}
-	break;
+		break;
 
-        default:
-            __E("Unknown ioctl received.\n");
-            return -EINVAL;
-    }
+	default:
+		__E("Unknown ioctl received.\n");
+		return -EINVAL;
+	}
 
-    return 0;
+	return 0;
 }
 
 static int mmap(struct file *filp, struct vm_area_struct *vma)
 {
-    phys_addr_t physp;
-    struct pool_buffer *entry;
-    unsigned long size = vma->vm_end - vma->vm_start;
-    size_t s;
+	phys_addr_t physp;
+	struct pool_buffer *entry;
+	unsigned long size = vma->vm_end - vma->vm_start;
+	size_t s;
 
-    __D("mmap: vma->vm_start     = %#lx\n", vma->vm_start);
-    __D("mmap: vma->vm_end       = %#lx\n", vma->vm_end);
-    __D("mmap: size              = %#lx\n", size);
-    __D("mmap: vma->vm_pgoff     = %#lx\n", vma->vm_pgoff);
+	__D("mmap: vma->vm_start     = %#lx\n", vma->vm_start);
+	__D("mmap: vma->vm_end       = %#lx\n", vma->vm_end);
+	__D("mmap: size              = %#lx\n", size);
+	__D("mmap: vma->vm_pgoff     = %#lx\n", vma->vm_pgoff);
 
-    physp = (unsigned long long)vma->vm_pgoff << PAGE_SHIFT;
+	physp = (unsigned long long)vma->vm_pgoff << PAGE_SHIFT;
 
-    if (mutex_lock_interruptible(&cmem_mutex)) {
-	return -ERESTARTSYS;
-    }
+	if (mutex_lock_interruptible(&cmem_mutex)) {
+		return -ERESTARTSYS;
+	}
 
-    s = size;
-    entry = find_busy_entry(physp, NULL, NULL, NULL, &s);
-    mutex_unlock(&cmem_mutex);
+	s = size;
+	entry = find_busy_entry(physp, NULL, NULL, NULL, &s);
+	mutex_unlock(&cmem_mutex);
 
-    if (entry != NULL) {
-	return mmap_buffer(entry, vma, size);
-    }
-    else {
-	__E("mmap: can't find allocated buffer with physp %#llx\n",
-	    (unsigned long long)physp);
+	if (entry != NULL) {
+		return mmap_buffer(entry, vma, size);
+	}
+	else {
+		__E("mmap: can't find allocated buffer with physp %#llx\n",
+		    (unsigned long long)physp);
 
-	return -EINVAL;
-    }
+		return -EINVAL;
+	}
 }
 
 static int open(struct inode *inode, struct file *filp)
 {
-    __D("open: called.\n");
+	__D("open: called.\n");
 
-    atomic_inc(&reference_count);
+	atomic_inc(&reference_count);
 
-    return 0;
+	return 0;
 }
 
 static int release(struct inode *inode, struct file *filp)
 {
-    struct list_head *registeredlistp;
-    struct list_head *freelistp;
-    struct list_head *busylistp;
-    struct list_head *e;
-    struct list_head *u;
-    struct list_head *next;
-    struct list_head *unext;
-    struct pool_buffer *entry;
-    struct registered_user *user;
-    int last_close = 0;
-    int num_pools;
-    int bi;
-    int i;
+	struct list_head *registeredlistp;
+	struct list_head *freelistp;
+	struct list_head *busylistp;
+	struct list_head *e;
+	struct list_head *u;
+	struct list_head *next;
+	struct list_head *unext;
+	struct pool_buffer *entry;
+	struct registered_user *user;
+	int last_close = 0;
+	int num_pools;
+	int bi;
+	int i;
 
-    __D("close: called.\n");
+	__D("close: called.\n");
 
-    /* Force free all buffers owned by the 'current' process */
+	/* Force free all buffers owned by the 'current' process */
 
-    if (atomic_dec_and_test(&reference_count)) {
-        __D("close: all references closed, force freeing all busy buffers.\n");
+	if (atomic_dec_and_test(&reference_count)) {
+	    __D("close: all references closed, force freeing all busy buffers.\n");
 
 	last_close = 1;
-    }
+	}
 
-    for (bi = 0; bi < (NBLOCKS + 1); bi++) {
+	for (bi = 0; bi < (NBLOCKS + 1); bi++) {
 	num_pools = npools[bi];
 	if (heap_pool[bi] != -1) {
 	    num_pools++;
@@ -2386,20 +2386,20 @@ static int release(struct inode *inode, struct file *filp)
 
 	    mutex_unlock(&cmem_mutex);
 	}
-    }
+	}
 
-    __D("close: returning\n");
+	__D("close: returning\n");
 
-    return 0;
+	return 0;
 }
 
 static void banner(void)
 {
-    printk(KERN_INFO "CMEMK module: reference Linux version %d.%d.%d\n",
-           (LINUX_VERSION_CODE & 0x00ff0000) >> 16,
-           (LINUX_VERSION_CODE & 0x0000ff00) >> 8,
-           (LINUX_VERSION_CODE & 0x000000ff) >> 0
-          );
+	printk(KERN_INFO "CMEMK module: reference Linux version %d.%d.%d\n",
+	       (LINUX_VERSION_CODE & 0x00ff0000) >> 16,
+	       (LINUX_VERSION_CODE & 0x0000ff00) >> 8,
+	       (LINUX_VERSION_CODE & 0x000000ff) >> 0
+	      );
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
@@ -2577,60 +2577,60 @@ int dt_config(void)
  */
 int cl_config(void)
 {
-    char *pstart[NBLOCKS];
-    char *pend[NBLOCKS];
-    char **pool_table[MAX_POOLS];
-    int err = 0;
-    int bi;
-    int i;
-    char *t;
+	char *pstart[NBLOCKS];
+	char *pend[NBLOCKS];
+	char **pool_table[MAX_POOLS];
+	int err = 0;
+	int bi;
+	int i;
+	char *t;
 
-    /* if allowOverlap != -1 then it was set on the command line (to 0 or 1) */
-    if (allowOverlap != -1) {
+	/* if allowOverlap != -1 then it was set on the command line (to 0 or 1) */
+	if (allowOverlap != -1) {
 	pr_warn("cmem_init: allowOverlap parameter has been deprecated, ignoring...\n");
-    }
+	}
 
-    if (npools[0] > MAX_POOLS) {
+	if (npools[0] > MAX_POOLS) {
 	__E("Too many pools specified (%d) for Block 0, only %d supported.\n", npools[0], MAX_POOLS);
 	return -EINVAL;
-    }
+	}
 
-    if (npools[1] > MAX_POOLS) {
+	if (npools[1] > MAX_POOLS) {
 	__E("Too many pools specified (%d) for Block 1, only %d supported.\n", npools[1], MAX_POOLS);
 	return -EINVAL;
-    }
+	}
 
-    if (npools[2] > MAX_POOLS) {
+	if (npools[2] > MAX_POOLS) {
 	__E("Too many pools specified (%d) for Block 2, only %d supported.\n", npools[2], MAX_POOLS);
 	return -EINVAL;
-    }
+	}
 
 /* cut-and-paste below as part of adding support for more than 4 blocks */
-    if (npools[3] > MAX_POOLS) {
+	if (npools[3] > MAX_POOLS) {
 	__E("Too many pools specified (%d) for Block 3, only %d supported.\n", npools[3], MAX_POOLS);
 	return -EINVAL;
-    }
+	}
 /* cut-and-paste above as part of adding support for more than 4 blocks */
 
-    pstart[0] = phys_start;
-    pend[0] = phys_end;
-    pool_table[0] = pools;
+	pstart[0] = phys_start;
+	pend[0] = phys_end;
+	pool_table[0] = pools;
 
-    pstart[1] = phys_start_1;
-    pend[1] = phys_end_1;
-    pool_table[1] = pools_1;
+	pstart[1] = phys_start_1;
+	pend[1] = phys_end_1;
+	pool_table[1] = pools_1;
 
-    pstart[2] = phys_start_2;
-    pend[2] = phys_end_2;
-    pool_table[2] = pools_2;
+	pstart[2] = phys_start_2;
+	pend[2] = phys_end_2;
+	pool_table[2] = pools_2;
 
 /* cut-and-paste below as part of adding support for more than 4 blocks */
-    pstart[3] = phys_start_3;
-    pend[3] = phys_end_3;
-    pool_table[3] = pools_3;
+	pstart[3] = phys_start_3;
+	pend[3] = phys_end_3;
+	pool_table[3] = pools_3;
 /* cut-and-paste above as part of adding support for more than 4 blocks */
 
-    for (bi = 0; bi < NBLOCKS; bi++) {
+	for (bi = 0; bi < NBLOCKS; bi++) {
 	if (!pstart[bi]) {
 	    continue;
 	}
@@ -2660,114 +2660,114 @@ int cl_config(void)
 	    }
 	    pool_size[bi][i] = simple_strtoll(t, NULL, 10);
 	}
-    }
+	}
 
 fail:
-    return err;
+	return err;
 }
 
 int __init cmem_init(void)
 {
-    int bi;
-    int i;
-    int err;
-    unsigned long long length;
-    HeapMem_Header *header;
-    char tmp_str[4];
-    void *virtp;
+	int bi;
+	int i;
+	int err;
+	unsigned long long length;
+	HeapMem_Header *header;
+	char tmp_str[4];
+	void *virtp;
 
-    banner();
+	banner();
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
-    if ((err = dt_config()) == -EINVAL) {
-        __E("bad DT config\n");
+	if ((err = dt_config()) == -EINVAL) {
+		__E("bad DT config\n");
 	return err;
-    }
-    else {
-	if (err == -ENODEV) {
-	    __D("no DT config\n");
 	}
-    }
+	else {
+	if (err == -ENODEV) {
+		__D("no DT config\n");
+	}
+	}
 #endif /* KERNEL_VERSION >= 3.14.0 */
 
-    if ((err = cl_config()) != 0) {
+	if ((err = cl_config()) != 0) {
 	__E("error %d processing command line\n", err);
 	return err;
-    }
+	}
 
-    mutex_init(&cmem_mutex);
+	mutex_init(&cmem_mutex);
 
-    cmem_major = register_chrdev(0, "cmem", &cmem_fxns);
+	cmem_major = register_chrdev(0, "cmem", &cmem_fxns);
 
-    if (cmem_major < 0) {
-        __E("Failed to allocate major number.\n");
-        return -ENODEV;
-    }
+	if (cmem_major < 0) {
+		__E("Failed to allocate major number.\n");
+		return -ENODEV;
+	}
 
-    __D("Allocated major number: %d\n", cmem_major);
+	__D("Allocated major number: %d\n", cmem_major);
 
-    cmem_class = class_create(THIS_MODULE, "cmem");
-    if (IS_ERR(cmem_class)) {
-        __E("Error creating cmem device class.\n");
+	cmem_class = class_create(THIS_MODULE, "cmem");
+	if (IS_ERR(cmem_class)) {
+		__E("Error creating cmem device class.\n");
 	err = -EIO;
 	goto fail_after_reg;
-    }
+	}
 
-    /* Create cmem device */
-    cmem_cma_dev_0 = device_create(cmem_class, NULL, MKDEV(cmem_major, 0),
+	/* Create cmem device */
+	cmem_cma_dev_0 = device_create(cmem_class, NULL, MKDEV(cmem_major, 0),
 				   NULL, "cmem");
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
-    cmem_cma_dev_0->coherent_dma_mask = DMA_BIT_MASK(32);
+	cmem_cma_dev_0->coherent_dma_mask = DMA_BIT_MASK(32);
 #if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
-    cmem_cma_dev_0->dma_pfn_offset = KEYSTONE_DMA_PFN_OFFSET;
+	cmem_cma_dev_0->dma_pfn_offset = KEYSTONE_DMA_PFN_OFFSET;
 #endif
 #endif
-    for (bi = 0; bi < NBLOCKS; bi++) {
-	if (!block_start[bi] || !block_end[bi]) {
-            if (bi != 0) {
-                continue;
-            }
+	for (bi = 0; bi < NBLOCKS; bi++) {
+		if (!block_start[bi] || !block_end[bi]) {
+			if (bi != 0) {
+				continue;
+			}
 
-	    /* we know block 0 wasn't specified, ensure no pools for it */
-	    if (pool_num_buffers[0][0]) {
+		/* we know block 0 wasn't specified, ensure no pools for it */
+		if (pool_num_buffers[0][0]) {
 		__E("pools specified: must specify both phys_start and phys_end, exiting...\n");
 		err = -EINVAL;
 		goto fail_after_create;
-	    }
-	    else {
+		}
+		else {
 		printk(KERN_INFO "no physical memory specified\n");
 
 		break;
-	    }
+		}
 	}
 
 	length = block_end[bi] - block_start[bi];
 
 	if (block_start[bi] == 0) {
-	    sprintf(tmp_str, "_%d", bi);
-	    __E("Physical address of 0 not allowed (phys_start%s)\n",
-	        bi == 0 ? "" : tmp_str);
-	    __E("  (minimum physical address is %#lx)\n", PAGE_SIZE);
-	    err = -EINVAL;
-	    goto fail_after_create;
+		sprintf(tmp_str, "_%d", bi);
+		__E("Physical address of 0 not allowed (phys_start%s)\n",
+			bi == 0 ? "" : tmp_str);
+		__E("  (minimum physical address is %#lx)\n", PAGE_SIZE);
+		err = -EINVAL;
+		goto fail_after_create;
 	}
 
 	if (block_end[bi] < block_start[bi]) {
-	    __E("phys_end (%#llx) < phys_start (%#llx)\n",
-	        block_end[bi], block_start[bi]);
-	    err = -EINVAL;
-	    goto fail_after_create;
+		__E("phys_end (%#llx) < phys_start (%#llx)\n",
+			block_end[bi], block_start[bi]);
+		err = -EINVAL;
+		goto fail_after_create;
 	}
 
 	block_avail_size[bi] = length;
 
 	if (block_type[bi] != BLOCK_TYPE_SRAM_NODE) {
 		__D("calling request_mem_region(%#llx, %#llx, \"CMEM\")\n",
-		    block_start[bi], length);
+			block_start[bi], length);
 
 		if (!request_mem_region(block_start[bi], length, "CMEM")) {
 			__E("Failed to request_mem_region(%#llx, %#llx)\n",
-			    block_start[bi], length);
+				block_start[bi], length);
 			err = -EFAULT;
 			goto fail_after_create;
 		}
@@ -2777,29 +2777,29 @@ int __init cmem_init(void)
 
 	/* Allocate the pools */
 	for (i = 0; i < npools[bi]; i++) {
-	    if (alloc_pool(bi, i, pool_num_buffers[bi][i], pool_size[bi][i],
-                NULL) < 0) {
+		if (alloc_pool(bi, i, pool_num_buffers[bi][i], pool_size[bi][i],
+				NULL) < 0) {
 		__E("Failed to alloc pool of size 0x%llu and number of buffers %d\n", pool_size[bi][i], pool_num_buffers[bi][i]);
 		err = -ENOMEM;
 		goto fail_after_create;
-	    }
+		}
 
-	    total_num_buffers[bi] += pool_num_buffers[bi][i];
+		total_num_buffers[bi] += pool_num_buffers[bi][i];
 	}
 
 	/* use whatever is left for the heap */
 	heap_size[bi] = block_avail_size[bi] & PAGE_MASK;
 	if (heap_size[bi] > 0) {
-	    err = alloc_pool(bi, npools[bi], 1, heap_size[bi], &heap_physp[bi]);
-	    if (err < 0) {
+		err = alloc_pool(bi, npools[bi], 1, heap_size[bi], &heap_physp[bi]);
+		if (err < 0) {
 		__E("Failed to alloc heap of size %#lx\n", heap_size[bi]);
 		goto fail_after_create;
-	    }
-	    printk(KERN_INFO "allocated heap buffer %#llx of size %#lx\n",
+		}
+		printk(KERN_INFO "allocated heap buffer %#llx of size %#lx\n",
 		   (unsigned long long)heap_physp[bi], heap_size[bi]);
-	    heap_pool[bi] = npools[bi];
-	    heap_head[bi].next = heap_physp[bi];
-	    heap_head[bi].size = heap_size[bi];
+		heap_pool[bi] = npools[bi];
+		heap_head[bi].next = heap_physp[bi];
+		heap_head[bi].size = heap_size[bi];
 
 		err = map_header((void **)&virtp, heap_physp[bi], &ioremap_area);
 		if (err < 0) {
@@ -2809,31 +2809,31 @@ int __init cmem_init(void)
 			goto fail_after_create;
 		}
 
-	    header = (HeapMem_Header *)virtp;
-	    header->next = 0;
-	    header->size = heap_size[bi];
+		header = (HeapMem_Header *)virtp;
+		header->next = 0;
+		header->size = heap_size[bi];
 
-	    unmap_header(virtp, ioremap_area);
+		unmap_header(virtp, ioremap_area);
 
-	    if (useHeapIfPoolUnavailable) {
+		if (useHeapIfPoolUnavailable) {
 		printk(KERN_INFO "heap fallback enabled - will try heap if "
-		       "pool buffer is not available\n");
-	    }
+			   "pool buffer is not available\n");
+		}
 	}
 	else {
-	    __D("no remaining memory for heap, no heap created "
-	           "for memory block %d\n", bi);
-	    heap_head[bi].next = 0;
+		__D("no remaining memory for heap, no heap created "
+			   "for memory block %d\n", bi);
+		heap_head[bi].next = 0;
 	}
 
 	__D("cmem initialized %d pools between %#llx and %#llx\n",
-	       npools[bi], block_start[bi], block_end[bi]);
+		   npools[bi], block_start[bi], block_end[bi]);
 
 	nblocks++;
-    }
+	}
 
 
-    if (cmem_cma_npools == 0) {
+	if (cmem_cma_npools == 0) {
 	/* no explicit pools, assuming global CMA area */
 	__D("no CMEM CMA pools found\n");
 
@@ -2844,184 +2844,184 @@ int __init cmem_init(void)
 
 	heap_pool[NBLOCKS] = 0;
 	npools[NBLOCKS] = 0;
-    }
-    else {
+	}
+	else {
 	__D("%d CMEM CMA pools\n", cmem_cma_npools);
 
 	for (i = 0; i < cmem_cma_npools; i++) {
-	    INIT_LIST_HEAD(&p_objs[NBLOCKS][i].busylist);
-	    p_objs[NBLOCKS][i].reqsize = cmem_cma_p_objs[i].reqsize;
-	    p_objs[NBLOCKS][i].size = cmem_cma_p_objs[i].size;
-	    p_objs[NBLOCKS][i].numbufs = cmem_cma_p_objs[i].numbufs;
+		INIT_LIST_HEAD(&p_objs[NBLOCKS][i].busylist);
+		p_objs[NBLOCKS][i].reqsize = cmem_cma_p_objs[i].reqsize;
+		p_objs[NBLOCKS][i].size = cmem_cma_p_objs[i].size;
+		p_objs[NBLOCKS][i].numbufs = cmem_cma_p_objs[i].numbufs;
 
-	    cmem_cma_dev[i].coherent_dma_mask = DMA_BIT_MASK(32);
+		cmem_cma_dev[i].coherent_dma_mask = DMA_BIT_MASK(32);
 #if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
 	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
-	    cmem_cma_dev[i].dma_pfn_offset = KEYSTONE_DMA_PFN_OFFSET;
+		cmem_cma_dev[i].dma_pfn_offset = KEYSTONE_DMA_PFN_OFFSET;
 #endif
-	    __D("    pool %d: size=%#llx numbufs=%d\n", i,
-	        p_objs[NBLOCKS][i].size, p_objs[NBLOCKS][i].numbufs);
+		__D("	pool %d: size=%#llx numbufs=%d\n", i,
+			p_objs[NBLOCKS][i].size, p_objs[NBLOCKS][i].numbufs);
 	}
 
 	if (cmem_cma_heapsize) {
-	    /* already init'ed p_objs in loop above */
-	    heap_pool[NBLOCKS] = cmem_cma_npools - 1;
-	    npools[NBLOCKS] = cmem_cma_npools - 1;
+		/* already init'ed p_objs in loop above */
+		heap_pool[NBLOCKS] = cmem_cma_npools - 1;
+		npools[NBLOCKS] = cmem_cma_npools - 1;
 	}
 	else {
-	    INIT_LIST_HEAD(&p_objs[NBLOCKS][cmem_cma_npools].busylist);
-	    p_objs[NBLOCKS][cmem_cma_npools].reqsize = 0;
-	    p_objs[NBLOCKS][cmem_cma_npools].size = 0;
-	    p_objs[NBLOCKS][cmem_cma_npools].numbufs = 1;
+		INIT_LIST_HEAD(&p_objs[NBLOCKS][cmem_cma_npools].busylist);
+		p_objs[NBLOCKS][cmem_cma_npools].reqsize = 0;
+		p_objs[NBLOCKS][cmem_cma_npools].size = 0;
+		p_objs[NBLOCKS][cmem_cma_npools].numbufs = 1;
 
-	    heap_pool[NBLOCKS] = cmem_cma_npools;
-	    npools[NBLOCKS] = cmem_cma_npools;
+		heap_pool[NBLOCKS] = cmem_cma_npools;
+		npools[NBLOCKS] = cmem_cma_npools;
 	}
-    }
+	}
 
-    /* Create the /proc entry */
-    cmem_proc_entry = proc_create("cmem", 0, NULL, &cmem_proc_ops);
+	/* Create the /proc entry */
+	cmem_proc_entry = proc_create("cmem", 0, NULL, &cmem_proc_ops);
 
-    printk(KERN_INFO "cmemk initialized\n");
+	printk(KERN_INFO "cmemk initialized\n");
 
-    return 0;
+	return 0;
 
 fail_after_create:
 
-    length = block_end[bi] - block_start[bi];
+	length = block_end[bi] - block_start[bi];
 
-    for (bi = 0; bi < NBLOCKS; bi++) {
-	if (block_flags[bi] & BLOCK_MEMREGION) {
-	    __D("calling release_mem_region(%#llx, %#llx)...\n",
-	        block_start[bi], length);
+	for (bi = 0; bi < NBLOCKS; bi++) {
+		if (block_flags[bi] & BLOCK_MEMREGION) {
+			__D("calling release_mem_region(%#llx, %#llx)...\n",
+			    block_start[bi], length);
 
-	    if (block_type[bi] != BLOCK_TYPE_SRAM_NODE)
-		release_mem_region(block_start[bi], length);
+			if (block_type[bi] != BLOCK_TYPE_SRAM_NODE)
+				release_mem_region(block_start[bi], length);
 
-	    block_flags[bi] &= ~BLOCK_MEMREGION;
+				block_flags[bi] &= ~BLOCK_MEMREGION;
+		}
 	}
-    }
 
-    device_destroy(cmem_class, MKDEV(cmem_major, 0));
-    class_destroy(cmem_class);
+	device_destroy(cmem_class, MKDEV(cmem_major, 0));
+	class_destroy(cmem_class);
 
 fail_after_reg:
-    __D("Unregistering character device cmem\n");
-    unregister_chrdev(cmem_major, "cmem");
+	__D("Unregistering character device cmem\n");
+	unregister_chrdev(cmem_major, "cmem");
 
-    return err;
+	return err;
 }
 
 void __exit cmem_exit(void)
 {
-    struct list_head *registeredlistp;
-    struct list_head *freelistp;
-    struct list_head *busylistp;
-    struct list_head *e;
-    struct list_head *u;
-    struct list_head *unext;
-    struct pool_buffer *entry;
-    struct registered_user *user;
-    unsigned long long length;
-    int num_pools;
-    int bi;
-    int i;
+	struct list_head *registeredlistp;
+	struct list_head *freelistp;
+	struct list_head *busylistp;
+	struct list_head *e;
+	struct list_head *u;
+	struct list_head *unext;
+	struct pool_buffer *entry;
+	struct registered_user *user;
+	unsigned long long length;
+	int num_pools;
+	int bi;
+	int i;
 
-    __D("In cmem_exit()\n");
+	__D("In cmem_exit()\n");
 
-    /* Remove the /proc entry */
-    remove_proc_entry("cmem", NULL);
+	/* Remove the /proc entry */
+	remove_proc_entry("cmem", NULL);
 
-    for (bi = 0; bi < NBLOCKS; bi++) {
+	for (bi = 0; bi < NBLOCKS; bi++) {
 	num_pools = npools[bi];
 
 	if (heap_pool[bi] != -1) {
-	    num_pools++;
+		num_pools++;
 	}
 
 	/* Free the pool structures and empty the lists. */
 	for (i = 0; i < num_pools; i++) {
-	    __D("Freeing memory associated with pool %d\n", i);
+		__D("Freeing memory associated with pool %d\n", i);
 
-	    freelistp = &p_objs[bi][i].freelist;
-	    busylistp = &p_objs[bi][i].busylist;
+		freelistp = &p_objs[bi][i].freelist;
+		busylistp = &p_objs[bi][i].busylist;
 
-	    e = busylistp->next;
-	    while (e != busylistp) {
-		entry = list_entry(e, struct pool_buffer, element);
+		e = busylistp->next;
+		while (e != busylistp) {
+			entry = list_entry(e, struct pool_buffer, element);
 
-		__D("Warning: Freeing busy entry %d at %#llx\n",
-		    entry->id, (unsigned long long)entry->physp);
+			__D("Warning: Freeing busy entry %d at %#llx\n",
+			    entry->id, (unsigned long long)entry->physp);
 
-		registeredlistp = &entry->users;
-		u = registeredlistp->next;
-		while (u != registeredlistp) {
-		    unext = u->next;
+			registeredlistp = &entry->users;
+			u = registeredlistp->next;
+			while (u != registeredlistp) {
+				unext = u->next;
 
-		    user = list_entry(u, struct registered_user, element);
+				user = list_entry(u, struct registered_user, element);
 
-		    __D("Removing file 0x%p from user list of buffer %#llx...\n",
-			user->filp, (unsigned long long)entry->physp);
+				__D("Removing file 0x%p from user list of buffer %#llx...\n",
+				user->filp, (unsigned long long)entry->physp);
 
-		    list_del(u);
-		    kfree(user);
+				list_del(u);
+				kfree(user);
 
-		    u = unext;
+				u = unext;
+			}
+
+			e = e->next;
+			kfree(entry);
 		}
 
-		e = e->next;
-		kfree(entry);
-	    }
+		e = freelistp->next;
+		while (e != freelistp) {
+			entry = list_entry(e, struct pool_buffer, element);
 
-	    e = freelistp->next;
-	    while (e != freelistp) {
-		entry = list_entry(e, struct pool_buffer, element);
+			__D("Freeing free entry %d at %#llx\n",
+			    entry->id, (unsigned long long)entry->physp);
 
-		__D("Freeing free entry %d at %#llx\n",
-		    entry->id, (unsigned long long)entry->physp);
+			registeredlistp = &entry->users;
+			u = registeredlistp->next;
+			while (u != registeredlistp) {
+				/* should never happen, but check to avoid mem leak */
+				unext = u->next;
 
-		registeredlistp = &entry->users;
-		u = registeredlistp->next;
-		while (u != registeredlistp) {
-		    /* should never happen, but check to avoid mem leak */
-		    unext = u->next;
+				user = list_entry(u, struct registered_user, element);
 
-		    user = list_entry(u, struct registered_user, element);
+				__D("Removing file 0x%p from user list of buffer %#llx...\n",
+				user->filp, (unsigned long long)entry->physp);
 
-		    __D("Removing file 0x%p from user list of buffer %#llx...\n",
-			user->filp, (unsigned long long)entry->physp);
+				list_del(u);
+				kfree(user);
 
-		    list_del(u);
-		    kfree(user);
+				u = unext;
+			}
 
-		    u = unext;
+			e = e->next;
+			kfree(entry);
 		}
-
-		e = e->next;
-		kfree(entry);
-	    }
 	}
 
 	length = block_end[bi] - block_start[bi];
 
 	if (block_flags[bi] & BLOCK_MEMREGION) {
-	    __D("calling release_mem_region(%#llx, %#llx)...\n",
-	        block_start[bi], length);
+		__D("calling release_mem_region(%#llx, %#llx)...\n",
+		    block_start[bi], length);
 
-	    if (block_type[bi] != BLOCK_TYPE_SRAM_NODE)
-		release_mem_region(block_start[bi], length);
+		if (block_type[bi] != BLOCK_TYPE_SRAM_NODE)
+			release_mem_region(block_start[bi], length);
 
-		block_flags[bi] &= ~BLOCK_MEMREGION;
+			block_flags[bi] &= ~BLOCK_MEMREGION;
+		}
 	}
-    }
 
-    device_destroy(cmem_class, MKDEV(cmem_major, 0));
-    class_destroy(cmem_class);
+	device_destroy(cmem_class, MKDEV(cmem_major, 0));
+	class_destroy(cmem_class);
 
-    __D("Unregistering character device cmem\n");
-    unregister_chrdev(cmem_major, "cmem");
+	__D("Unregistering character device cmem\n");
+	unregister_chrdev(cmem_major, "cmem");
 
-    printk(KERN_INFO "cmemk unregistered\n");
+	printk(KERN_INFO "cmemk unregistered\n");
 }
 
 MODULE_LICENSE("GPL");
@@ -3057,14 +3057,14 @@ module_exit(cmem_exit);
 #define CACHE_DLINESIZE 32
 
 asm("\n \
-        .global arm926_dma_map_area\n \
+	.global arm926_dma_map_area\n \
 arm926_dma_map_area:\n \
-        add     r1, r1, r0\n \
-@        cmp     r2, #DMA_TO_DEVICE\n \
-        cmp     r2, #1\n \
-        beq     arm926_dma_clean_range\n \
-        bcs     arm926_dma_inv_range\n \
-        b       arm926_dma_flush_range\n \
+	add     r1, r1, r0\n \
+@	cmp     r2, #DMA_TO_DEVICE\n \
+	cmp     r2, #1\n \
+	beq     arm926_dma_clean_range\n \
+	bcs     arm926_dma_inv_range\n \
+	b       arm926_dma_flush_range\n \
 ");
 
 /*
@@ -3085,20 +3085,20 @@ asm("\n \
 	.global arm926_dma_inv_range\n \
 arm926_dma_inv_range:\n \
 @        tst     r0, #CACHE_DLINESIZE - 1\n \
-        tst     r0, #32 - 1\n \
-        mcrne   p15, 0, r0, c7, c10, 1          @ clean D entry\n \
-@        tst     r1, #CACHE_DLINESIZE - 1\n \
-        tst     r1, #32 - 1\n \
-        mcrne   p15, 0, r1, c7, c10, 1          @ clean D entry\n \
-@        bic     r0, r0, #CACHE_DLINESIZE - 1\n \
-        bic     r0, r0, #32 - 1\n \
-1:      mcr     p15, 0, r0, c7, c6, 1           @ invalidate D entry\n \
-@        add     r0, r0, #CACHE_DLINESIZE\n \
-        add     r0, r0, #32\n \
-        cmp     r0, r1\n \
-        blo     1b\n \
-        mcr     p15, 0, r0, c7, c10, 4          @ drain WB\n \
-        mov     pc, lr\n \
+	tst     r0, #32 - 1\n \
+	mcrne   p15, 0, r0, c7, c10, 1          @ clean D entry\n \
+@	tst     r1, #CACHE_DLINESIZE - 1\n \
+	tst     r1, #32 - 1\n \
+	mcrne   p15, 0, r1, c7, c10, 1          @ clean D entry\n \
+@	bic     r0, r0, #CACHE_DLINESIZE - 1\n \
+	bic     r0, r0, #32 - 1\n \
+1:	mcr     p15, 0, r0, c7, c6, 1           @ invalidate D entry\n \
+@	add     r0, r0, #CACHE_DLINESIZE\n \
+	add     r0, r0, #32\n \
+	cmp     r0, r1\n \
+	blo     1b\n \
+	mcr     p15, 0, r0, c7, c10, 4          @ drain WB\n \
+	mov     pc, lr\n \
 ");
 
 /*
@@ -3115,15 +3115,15 @@ ENTRY(arm926_dma_clean_range)
 asm("\n \
 	.global arm926_dma_clean_range\n \
 arm926_dma_clean_range:\n \
-@        bic     r0, r0, #CACHE_DLINESIZE - 1\n \
-        bic     r0, r0, #32 - 1\n \
-1:      mcr     p15, 0, r0, c7, c10, 1          @ clean D entry\n \
-@        add     r0, r0, #CACHE_DLINESIZE\n \
-        add     r0, r0, #32\n \
-        cmp     r0, r1\n \
-        blo     1b\n \
-        mcr     p15, 0, r0, c7, c10, 4          @ drain WB\n \
-        mov     pc, lr\n \
+@	bic     r0, r0, #CACHE_DLINESIZE - 1\n \
+	bic     r0, r0, #32 - 1\n \
+1:	mcr     p15, 0, r0, c7, c10, 1          @ clean D entry\n \
+@	add     r0, r0, #CACHE_DLINESIZE\n \
+	add     r0, r0, #32\n \
+	cmp     r0, r1\n \
+	blo     1b\n \
+	mcr     p15, 0, r0, c7, c10, 4          @ drain WB\n \
+	mov     pc, lr\n \
 ");
 
 /*
@@ -3138,16 +3138,16 @@ ENTRY(arm926_dma_flush_range)
 asm("\n \
 	.global arm926_dma_flush_range\n \
 arm926_dma_flush_range:\n \
-@        bic     r0, r0, #CACHE_DLINESIZE - 1\n \
-        bic     r0, r0, #32 - 1\n \
+@	bic     r0, r0, #CACHE_DLINESIZE - 1\n \
+	bic     r0, r0, #32 - 1\n \
 1:\n \
-        mcr     p15, 0, r0, c7, c14, 1          @ clean+invalidate D entry\n \
-@        add     r0, r0, #CACHE_DLINESIZE\n \
-        add     r0, r0, #32\n \
-        cmp     r0, r1\n \
-        blo     1b\n \
-        mcr     p15, 0, r0, c7, c10, 4          @ drain WB\n \
-        mov     pc, lr\n \
+	mcr     p15, 0, r0, c7, c14, 1          @ clean+invalidate D entry\n \
+@	add     r0, r0, #CACHE_DLINESIZE\n \
+	add     r0, r0, #32\n \
+	cmp     r0, r1\n \
+	blo     1b\n \
+	mcr     p15, 0, r0, c7, c10, 4          @ drain WB\n \
+	mov     pc, lr\n \
 ");
 
 #else  /* CONFIG_CPU_ARM926T */
@@ -3166,11 +3166,11 @@ asm("\n \
 	.global v7_dma_inv_range\n \
 v7_dma_inv_range:\n \
 @	dcache_line_size r2, r3\n \
-        mrc     p15, 0, r3, c0, c0, 1         @ read ctr\n \
-        lsr     r3, r3, #16\n \
-        and     r3, r3, #0xf                @ cache line size encoding\n \
-        mov     r2, #4                        @ bytes per word\n \
-        mov     r2, r2, lsl r3            @ actual cache line size\n \
+	mrc     p15, 0, r3, c0, c0, 1         @ read ctr\n \
+	lsr     r3, r3, #16\n \
+	and     r3, r3, #0xf                @ cache line size encoding\n \
+	mov     r2, #4                        @ bytes per word\n \
+	mov     r2, r2, lsl r3            @ actual cache line size\n \
 \n \
 	sub	r3, r2, #1\n \
 	tst	r0, r3\n \
@@ -3201,11 +3201,11 @@ asm("\n \
 	.global v7_dma_clean_range\n \
 v7_dma_clean_range:\n \
 @	dcache_line_size r2, r3\n \
-        mrc     p15, 0, r3, c0, c0, 1         @ read ctr\n \
-        lsr     r3, r3, #16\n \
-        and     r3, r3, #0xf                @ cache line size encoding\n \
-        mov     r2, #4                        @ bytes per word\n \
-        mov     r2, r2, lsl r3            @ actual cache line size\n \
+	mrc     p15, 0, r3, c0, c0, 1         @ read ctr\n \
+	lsr     r3, r3, #16\n \
+	and     r3, r3, #0xf                @ cache line size encoding\n \
+	mov     r2, #4                        @ bytes per word\n \
+	mov     r2, r2, lsl r3            @ actual cache line size\n \
 \n \
 	sub	r3, r2, #1\n \
 	bic	r0, r0, r3\n \
@@ -3231,11 +3231,11 @@ asm("\n \
 	.global v7_dma_flush_range\n \
 v7_dma_flush_range:\n \
 @	dcache_line_size r2, r3\n \
-        mrc     p15, 0, r3, c0, c0, 1         @ read ctr\n \
-        lsr     r3, r3, #16\n \
-        and     r3, r3, #0xf                @ cache line size encoding\n \
-        mov     r2, #4                        @ bytes per word\n \
-        mov     r2, r2, lsl r3            @ actual cache line size\n \
+	mrc     p15, 0, r3, c0, c0, 1         @ read ctr\n \
+	lsr     r3, r3, #16\n \
+	and     r3, r3, #0xf                @ cache line size encoding\n \
+	mov     r2, #4                        @ bytes per word\n \
+	mov     r2, r2, lsl r3            @ actual cache line size\n \
 \n \
 	sub	r3, r2, #1\n \
 	bic	r0, r0, r3\n \
@@ -3262,11 +3262,11 @@ asm("\n \
 	.global v7_dma_map_area\n \
 v7_dma_map_area:\n \
 	add	r1, r1, r0\n \
-@        cmp     r2, #DMA_TO_DEVICE\n \
-        cmp     r2, #1\n \
-        beq     v7_dma_clean_range\n \
-        bcs     v7_dma_inv_range\n \
-        b       v7_dma_flush_range\n \
+@	cmp     r2, #DMA_TO_DEVICE\n \
+	cmp     r2, #1\n \
+	beq     v7_dma_clean_range\n \
+	bcs     v7_dma_inv_range\n \
+	b       v7_dma_flush_range\n \
 ");
 
 /*
