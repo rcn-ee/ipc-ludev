@@ -123,8 +123,8 @@ static char *pools[MAX_POOLS] = {
 	NULL
 };
 MODULE_PARM_DESC(pools,
-	"\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
-	"\n\t\t decimal sizes");
+		 "\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
+		 "\n\t\t decimal sizes");
 module_param_array(pools, charp, &npools[0], S_IRUGO);
 
 /* begin block 1 */
@@ -156,8 +156,8 @@ static char *pools_2[MAX_POOLS] = {
 	NULL
 };
 MODULE_PARM_DESC(pools_2,
-	"\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
-	"\n\t\t decimal sizes, for Extended CMEM Pool");
+		 "\n\t\t List of Pool Sizes and Number of Entries, comma separated,"
+		 "\n\t\t decimal sizes, for Extended CMEM Pool");
 module_param_array(pools_2, charp, &npools[2], S_IRUGO);
 /* end block 2 */
 
@@ -199,7 +199,7 @@ static struct mutex cmem_mutex;
 typedef struct pool_buffer {
 	struct list_head element;
 	struct list_head users;
-	dma_addr_t dma;             /* used only for CMA-based allocs */
+	dma_addr_t dma;			/* used only for CMA-based allocs */
 	int id;
 	phys_addr_t physp;
 	int flags;			/* CMEM_CACHED or CMEM_NONCACHED */
@@ -353,7 +353,7 @@ static int map_header(void **vaddrp, phys_addr_t physp)
 		__E("map_header: ioremap(%#llx, %#llx) failed \n",
 		    (unsigned long long)physp,
 		    (unsigned long long)PAGE_SIZE);
-	return -ENOMEM;
+		return -ENOMEM;
 	}
 	*vaddrp = vaddr;
 
@@ -506,19 +506,19 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
 					ret_value = map_header((void **)&prevHeader, prevHeaderPhys);
 					if (ret_value < 0)
 						return 0;
-			}
-			else {
-				prevHeader = &heap_head[bi];
-			}
+				}
+				else {
+					prevHeader = &heap_head[bi];
+				}
 
-			if (remainSize) {
-				prevHeader->next = newHeaderPhys;
-			}
-			else {
-				prevHeader->next = curHeader->next;
-			}
+				if (remainSize) {
+					prevHeader->next = newHeaderPhys;
+				}
+				else {
+					prevHeader->next = curHeader->next;
+				}
 
-			if (prevHeader != &heap_head[bi]) {
+				if (prevHeader != &heap_head[bi]) {
 					unmap_header(prevHeader);
 				}
 			}
@@ -837,66 +837,66 @@ void *find_buffer_n(struct seq_file *s, int n)
 	count = 0;
 
 	for (bi = 0; bi < NBLOCKS; bi++) {
-	for (i = 0; i < npools[bi]; i++) {
-		listp = &p_objs[bi][i].busylist;
-		listp = listp->next;
-		busy_empty = 1;
-		while (listp != &p_objs[bi][i].busylist) {
-		busy_empty = 0;
-		if (count == n) {
-			found = 1;
-			s->private = (void *)((int)s->private | BUSY_ENTRY);
+		for (i = 0; i < npools[bi]; i++) {
+			listp = &p_objs[bi][i].busylist;
+			listp = listp->next;
+			busy_empty = 1;
+			while (listp != &p_objs[bi][i].busylist) {
+				busy_empty = 0;
+				if (count == n) {
+					found = 1;
+					s->private = (void *)((int)s->private | BUSY_ENTRY);
 
-			break;
-		}
-		count++;
-		listp = listp->next;
+					break;
+				}
+				count++;
+				listp = listp->next;
+			}
+			if (found) {
+				break;
+			}
+
+			listp = &p_objs[bi][i].freelist;
+			listp = listp->next;
+			free_empty = 1;
+			while (listp != &p_objs[bi][i].freelist) {
+				if (i == 0 ||
+				    (p_objs[bi][i - 1].freelist.next !=
+				     &p_objs[bi][i - 1].freelist)) {
+
+					free_empty = 0;
+				}
+				if (count == n) {
+					found = 1;
+					s->private = (void *)((int)s->private | FREE_ENTRY);
+
+					break;
+				}
+				count++;
+				listp = listp->next;
+			}
+			if (found) {
+				break;
+			}
 		}
 		if (found) {
-		break;
-		}
-
-		listp = &p_objs[bi][i].freelist;
-		listp = listp->next;
-		free_empty = 1;
-		while (listp != &p_objs[bi][i].freelist) {
-		if (i == 0 ||
-			(p_objs[bi][i - 1].freelist.next !=
-			&p_objs[bi][i - 1].freelist)) {
-
-			free_empty = 0;
-		}
-		if (count == n) {
-			found = 1;
-			s->private = (void *)((int)s->private | FREE_ENTRY);
-
 			break;
 		}
-		count++;
-		listp = listp->next;
-		}
-		if (found) {
-		break;
-		}
-	}
-	if (found) {
-		break;
-	}
 	}
 
 	if (!found) {
-	listp = NULL;
+		listp = NULL;
 	}
 	else {
-	if (busy_empty) {
-		s->private = (void *)((int)s->private | SHOW_BUSY_BANNER);
-	}
-	if (free_empty) {
-		s->private = (void *)((int)s->private | SHOW_PREV_FREE_BANNER);
-	}
-	if (count == (total_num_buffers[bi] - 1)) {
-		s->private = (void *)((int)s->private | SHOW_LAST_FREE_BANNER);
-	}
+		if (busy_empty) {
+			s->private = (void *)((int)s->private | SHOW_BUSY_BANNER);
+		}
+		if (free_empty) {
+			s->private = (void *)((int)s->private | SHOW_PREV_FREE_BANNER);
+		}
+		if (count == (total_num_buffers[bi] - 1)) {
+			s->private = (void *)((int)s->private | SHOW_LAST_FREE_BANNER);
+		}
 	}
 
 	return listp;
@@ -915,16 +915,16 @@ static void *cmem_seq_start(struct seq_file *s, loff_t *pos)
 	int total_num;
 
 	if (mutex_lock_interruptible(&cmem_mutex)) {
-	return ERR_PTR(-ERESTARTSYS);
+		return ERR_PTR(-ERESTARTSYS);
 	}
 
 	__D("cmem_seq_start: *pos=%d\n", (int)*pos);
 
 	total_num = total_num_buffers[0] + total_num_buffers[1];
 	if (*pos >= total_num) {
-	__D("  %d >= %d\n", (int)*pos, total_num);
+		__D("  %d >= %d\n", (int)*pos, total_num);
 
-	return NULL;
+		return NULL;
 	}
 
 	listp = find_buffer_n(s, *pos);
@@ -946,9 +946,9 @@ static void *cmem_seq_next(struct seq_file *s, void *v, loff_t *pos)
 
 	total_num = total_num_buffers[0] + total_num_buffers[1];
 	if (*pos >= total_num) {
-	__D("  %d >= %d\n", (int)*pos, total_num);
+		__D("  %d >= %d\n", (int)*pos, total_num);
 
-	return NULL;
+		return NULL;
 	}
 
 	listp = find_buffer_n(s, *pos);
@@ -987,52 +987,52 @@ static int cmem_seq_show(struct seq_file *s, void *v)
 	__D("cmem_seq_show:\n");
 
 	for (bi = 0; bi < NBLOCKS; bi++) {
-	/* look for banners to show */
-	for (i = 0; i < npools[bi]; i++) {
-		if (listp == p_objs[bi][i].busylist.next) {
-		/* first buffer in busylist */
-		if ((int)s->private & SHOW_PREV_FREE_BANNER) {
-			/*
-			 * Previous pool's freelist empty, need to show banner.
-			 */
-			show_free_banner(s, i - 1);
-		}
-		show_busy_banner(bi, s, i);
+		/* look for banners to show */
+		for (i = 0; i < npools[bi]; i++) {
+			if (listp == p_objs[bi][i].busylist.next) {
+				/* first buffer in busylist */
+				if ((int)s->private & SHOW_PREV_FREE_BANNER) {
+					/*
+					 * Previous pool's freelist empty, need to show banner.
+					 */
+					show_free_banner(s, i - 1);
+				}
+				show_busy_banner(bi, s, i);
 
-		break;
-		}
-		if (listp == p_objs[bi][i].freelist.next) {
-		/* first buffer in freelist */
-		if ((int)s->private & SHOW_PREV_FREE_BANNER) {
-			/*
-			 * Previous pool's freelist & this pool's busylist empty,
-			 * need to show banner.
-			 */
-			show_free_banner(s, i - 1);
-		}
-		if ((int)s->private & SHOW_BUSY_BANNER) {
-			/*
-			 * This pool's busylist empty, need to show banner.
-			 */
-			show_busy_banner(bi, s, i);
-		}
-		show_free_banner(s, i);
+				break;
+			}
+			if (listp == p_objs[bi][i].freelist.next) {
+				/* first buffer in freelist */
+				if ((int)s->private & SHOW_PREV_FREE_BANNER) {
+					/*
+					 * Previous pool's freelist & this pool's busylist empty,
+					 * need to show banner.
+					 */
+					show_free_banner(s, i - 1);
+				}
+				if ((int)s->private & SHOW_BUSY_BANNER) {
+					/*
+					 * This pool's busylist empty, need to show banner.
+					 */
+					show_busy_banner(bi, s, i);
+				}
+				show_free_banner(s, i);
 
-		break;
+				break;
+			}
 		}
-	}
 	}
 
 	entry = list_entry(e, struct pool_buffer, element);
 
 	if ((int)s->private & BUSY_ENTRY) {
-	attr = entry->flags & CMEM_CACHED ? "(cached)" : "(noncached)";
-	seq_printf(s, "id %d: phys addr %#llx %s\n", entry->id,
-		   (unsigned long long)entry->physp, attr);
+		attr = entry->flags & CMEM_CACHED ? "(cached)" : "(noncached)";
+		seq_printf(s, "id %d: phys addr %#llx %s\n", entry->id,
+			   (unsigned long long)entry->physp, attr);
 	}
 	else {
-	seq_printf(s, "id %d: phys addr %#llx\n", entry->id,
-		   (unsigned long long)entry->physp);
+		seq_printf(s, "id %d: phys addr %#llx\n", entry->id,
+			   (unsigned long long)entry->physp);
 	}
 
 	if ((int)s->private & BUSY_ENTRY &&
@@ -1446,8 +1446,8 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 	int ret;
 
 	if (_IOC_TYPE(cmd) != _IOC_TYPE(CMEM_IOCMAGIC)) {
-	__E("ioctl(): bad command type %#x (should be %#x)\n",
-		_IOC_TYPE(cmd), _IOC_TYPE(CMEM_IOCMAGIC));
+		__E("ioctl(): bad command type %#x (should be %#x)\n",
+		    _IOC_TYPE(cmd), _IOC_TYPE(CMEM_IOCMAGIC));
 	}
 
 	switch (cmd & CMEM_IOCCMDMASK) {
@@ -1477,7 +1477,7 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 
 		if (bi > NBLOCKS || bi < 0) {
 			__E("ioctl: invalid block id %d, must be < %d\n",
-			bi, NBLOCKS);
+			    bi, NBLOCKS);
 			return -EINVAL;
 		}
 
@@ -1505,19 +1505,19 @@ alloc:
 		size = PAGE_ALIGN(size);
 
 		if (bi == NBLOCKS) {
-		virtp = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
+			virtp = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
 
 #if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
 	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
-		/* adjust from 32-bit alias to 36-bit phys */
-		physp = dma
-			+ ((unsigned long long)KEYSTONE_DMA_PFN_OFFSET
-			   << PAGE_SHIFT);
+			/* adjust from 32-bit alias to 36-bit phys */
+			physp = dma
+				+ ((unsigned long long)KEYSTONE_DMA_PFN_OFFSET
+				   << PAGE_SHIFT);
 #else
-		physp = dma;
+			physp = dma;
 #endif
-		entry->dev = dev;
-		entry->kvirtp = virtp;
+			entry->dev = dev;
+			entry->kvirtp = virtp;
 		}
 		else {
 			physp = HeapMem_alloc(bi, size, align, ALLOCRUN);
@@ -1715,7 +1715,7 @@ alloc:
 				user = list_entry(u, struct registered_user, element);
 				if (user->filp == filp) {
 					__D("FREE%s%s: Removing file 0x%p from user list of buffer %#llx...\n",
-				    	    cmd & CMEM_HEAP ? "HEAP" : "",
+					    cmd & CMEM_HEAP ? "HEAP" : "",
 					    cmd & CMEM_PHYS ? "PHYS" : "",
 					    filp, (unsigned long long)physp);
 
@@ -1730,9 +1730,9 @@ alloc:
 
 			if (u == registeredlistp) {
 				__E("FREE%s%s: Not a registered user of physical buffer %#llx\n",
-				cmd & CMEM_HEAP ? "HEAP" : "",
-				cmd & CMEM_PHYS ? "PHYS" : "",
-				(unsigned long long)physp);
+				    cmd & CMEM_HEAP ? "HEAP" : "",
+				    cmd & CMEM_PHYS ? "PHYS" : "",
+				    (unsigned long long)physp);
 				mutex_unlock(&cmem_mutex);
 
 				return -EFAULT;
@@ -1811,10 +1811,10 @@ alloc:
 			}
 
 			__D("FREE%s%s: returning size 0x%x, poolid %d\n",
-			cmd & CMEM_HEAP ? "HEAP" : "",
-			cmd & CMEM_PHYS ? "PHYS" : "",
-			allocDesc.free_outparams.size,
-			allocDesc.free_outparams.poolid);
+			    cmd & CMEM_HEAP ? "HEAP" : "",
+			    cmd & CMEM_PHYS ? "PHYS" : "",
+			    allocDesc.free_outparams.size,
+			    allocDesc.free_outparams.poolid);
 		}
 
 		break;
@@ -1833,7 +1833,7 @@ alloc:
 
 		if (physp == ~(0LL)) {
 			__E("GETPHYS: Failed to convert virtual %#lx to physical.\n",
-				virtArg);
+			    virtArg);
 			return -EFAULT;
 		}
 
@@ -1862,9 +1862,9 @@ alloc:
 		}
 
 		if (bi > NBLOCKS || bi < 0) {
-		__E("ioctl: invalid block id %d, must be < %d\n",
-			bi, NBLOCKS);
-		return -EINVAL;
+			__E("ioctl: invalid block id %d, must be < %d\n",
+			    bi, NBLOCKS);
+			return -EINVAL;
 		}
 
 		if (pool >= npools[bi] || pool < 0) {
@@ -2283,93 +2283,93 @@ static int release(struct inode *inode, struct file *filp)
 	/* Force free all buffers owned by the 'current' process */
 
 	if (atomic_dec_and_test(&reference_count)) {
-	    __D("close: all references closed, force freeing all busy buffers.\n");
+		__D("close: all references closed, force freeing all busy buffers.\n");
 
-	last_close = 1;
+		last_close = 1;
 	}
 
 	for (bi = 0; bi < (NBLOCKS + 1); bi++) {
-	num_pools = npools[bi];
-	if (heap_pool[bi] != -1) {
-	    num_pools++;
-	}
-
-	/* Clean up any buffers on the busy list when cmem is closed */
-	for (i = 0; i < num_pools; i++) {
-	    __D("Forcing free on pool %d\n", i);
-
-	    /* acquire the mutex in case this isn't the last close */
-	    if (mutex_lock_interruptible(&cmem_mutex)) {
-		return -ERESTARTSYS;
-	    }
-
-	    freelistp = &p_objs[bi][i].freelist;
-	    busylistp = &p_objs[bi][i].busylist;
-
-	    e = busylistp->next;
-	    while (e != busylistp) {
-		__D("busy entry(s) found\n");
-
-		next = e->next;
-
-		entry = list_entry(e, struct pool_buffer, element);
-		registeredlistp = &entry->users;
-		u = registeredlistp->next;
-		while (u != registeredlistp) {
-		    unext = u->next;
-
-		    user = list_entry(u, struct registered_user, element);
-
-		    if (last_close || user->filp == filp) {
-			__D("Removing file 0x%p from user list of buffer %#llx...\n",
-			    user->filp, (unsigned long long)entry->physp);
-
-			list_del(u);
-			kfree(user);
-		    }
-
-		    u = unext;
+		num_pools = npools[bi];
+		if (heap_pool[bi] != -1) {
+			num_pools++;
 		}
 
-		if (registeredlistp->next == registeredlistp) {
-		    /* no more registered users, free buffer */
+		/* Clean up any buffers on the busy list when cmem is closed */
+		for (i = 0; i < num_pools; i++) {
+			__D("Forcing free on pool %d\n", i);
 
-		    if ((heap_pool[bi] != -1) && (i == (num_pools - 1))) {
-			/* HEAP */
-			__D("Warning: Freeing 'busy' buffer from heap at "
-			    "%#llx\n", (unsigned long long)entry->physp);
-
-			if (bi == NBLOCKS) {
-			    dma_free_coherent(NULL, entry->size,
-			                      entry->kvirtp, entry->dma);
+			/* acquire the mutex in case this isn't the last close */
+			if (mutex_lock_interruptible(&cmem_mutex)) {
+				return -ERESTARTSYS;
 			}
-			else {
+
+			freelistp = &p_objs[bi][i].freelist;
+			busylistp = &p_objs[bi][i].busylist;
+
+			e = busylistp->next;
+			while (e != busylistp) {
+				__D("busy entry(s) found\n");
+
+				next = e->next;
+
+				entry = list_entry(e, struct pool_buffer, element);
+				registeredlistp = &entry->users;
+				u = registeredlistp->next;
+				while (u != registeredlistp) {
+					unext = u->next;
+
+					user = list_entry(u, struct registered_user, element);
+
+					if (last_close || user->filp == filp) {
+						__D("Removing file 0x%p from user list of buffer %#llx...\n",
+						    user->filp, (unsigned long long)entry->physp);
+
+						list_del(u);
+						kfree(user);
+					}
+
+					u = unext;
+				}
+
+				if (registeredlistp->next == registeredlistp) {
+					/* no more registered users, free buffer */
+
+					if ((heap_pool[bi] != -1) && (i == (num_pools - 1))) {
+						/* HEAP */
+						__D("Warning: Freeing 'busy' buffer from heap at "
+						    "%#llx\n", (unsigned long long)entry->physp);
+
+						if (bi == NBLOCKS) {
+							dma_free_coherent(NULL, entry->size,
+							entry->kvirtp, entry->dma);
+						}
+						else {
 							/* Free any kernel virtual address mapping for exported buffers */
 							if(entry->kvirtp) {
 								iounmap(entry->kvirtp);
 								entry->kvirtp = NULL;
 							}
 
-			    HeapMem_free(bi, entry->physp, entry->size);
-			}
-			list_del(e);
-			kfree(entry);
+							HeapMem_free(bi, entry->physp, entry->size);
+						}
+						list_del(e);
+						kfree(entry);
 					} else {
-			/* POOL */
-			__D("Warning: Putting 'busy' buffer from pool %d at "
-			    "%#llx on freelist\n",
-			    i, (unsigned long long)entry->physp);
+						/* POOL */
+						__D("Warning: Putting 'busy' buffer from pool %d at "
+						    "%#llx on freelist\n",
+						    i, (unsigned long long)entry->physp);
 
-			list_del_init(e);
-			list_add(e, freelistp);
-		    }
+						list_del_init(e);
+						list_add(e, freelistp);
+					}
+				}
+
+				e = next;
+			}
+
+			mutex_unlock(&cmem_mutex);
 		}
-
-		e = next;
-	    }
-
-	    mutex_unlock(&cmem_mutex);
-	}
 	}
 
 	__D("close: returning\n");
@@ -2508,7 +2508,7 @@ int dt_config(void)
 
 		if (num_pools > MAX_POOLS) {
 			__E("bad cmem-buf-pools: too many pools\n"
-			"  must be <= %d\n", MAX_POOLS);
+			    "  must be <= %d\n", MAX_POOLS);
 				return -EINVAL;
 		}
 
@@ -2571,28 +2571,32 @@ int cl_config(void)
 
 	/* if allowOverlap != -1 then it was set on the command line (to 0 or 1) */
 	if (allowOverlap != -1) {
-	pr_warn("cmem_init: allowOverlap parameter has been deprecated, ignoring...\n");
+		pr_warn("cmem_init: allowOverlap parameter has been deprecated, ignoring...\n");
 	}
 
 	if (npools[0] > MAX_POOLS) {
-	__E("Too many pools specified (%d) for Block 0, only %d supported.\n", npools[0], MAX_POOLS);
-	return -EINVAL;
+		__E("Too many pools specified (%d) for Block 0, only %d supported.\n",
+		    npools[0], MAX_POOLS);
+		return -EINVAL;
 	}
 
 	if (npools[1] > MAX_POOLS) {
-	__E("Too many pools specified (%d) for Block 1, only %d supported.\n", npools[1], MAX_POOLS);
-	return -EINVAL;
+		__E("Too many pools specified (%d) for Block 1, only %d supported.\n",
+		    npools[1], MAX_POOLS);
+		return -EINVAL;
 	}
 
 	if (npools[2] > MAX_POOLS) {
-	__E("Too many pools specified (%d) for Block 2, only %d supported.\n", npools[2], MAX_POOLS);
-	return -EINVAL;
+		__E("Too many pools specified (%d) for Block 2, only %d supported.\n",
+		    npools[2], MAX_POOLS);
+		return -EINVAL;
 	}
 
 /* cut-and-paste below as part of adding support for more than 4 blocks */
 	if (npools[3] > MAX_POOLS) {
-	__E("Too many pools specified (%d) for Block 3, only %d supported.\n", npools[3], MAX_POOLS);
-	return -EINVAL;
+		__E("Too many pools specified (%d) for Block 3, only %d supported.\n",
+		    npools[3], MAX_POOLS);
+		return -EINVAL;
 	}
 /* cut-and-paste above as part of adding support for more than 4 blocks */
 
@@ -2615,35 +2619,35 @@ int cl_config(void)
 /* cut-and-paste above as part of adding support for more than 4 blocks */
 
 	for (bi = 0; bi < NBLOCKS; bi++) {
-	if (!pstart[bi]) {
-	    continue;
-	}
+		if (!pstart[bi]) {
+			continue;
+		}
 
-	if (block_start[bi]) {
-	    __D("block %d specified in DT, ignoring cmd line\n", bi);
-	    continue;
-	}
+		if (block_start[bi]) {
+			__D("block %d specified in DT, ignoring cmd line\n", bi);
+			continue;
+		}
 
-	/* Get the start and end of CMEM memory */
-	block_start[bi] = PAGE_ALIGN(simple_strtoll(pstart[bi], NULL, 16));
-	block_end[bi] = PAGE_ALIGN(simple_strtoll(pend[bi], NULL, 16));
+		/* Get the start and end of CMEM memory */
+		block_start[bi] = PAGE_ALIGN(simple_strtoll(pstart[bi], NULL, 16));
+		block_end[bi] = PAGE_ALIGN(simple_strtoll(pend[bi], NULL, 16));
 
-	/* Parse the pools */
-	for (i = 0; i < npools[bi]; i++) {
-	    t = strsep(&pool_table[bi][i], "x");
-	    if (!t) {
-		err = -EINVAL;
-		goto fail;
-	    }
-	    pool_num_buffers[bi][i] = simple_strtol(t, NULL, 10);
+		/* Parse the pools */
+		for (i = 0; i < npools[bi]; i++) {
+			t = strsep(&pool_table[bi][i], "x");
+			if (!t) {
+				err = -EINVAL;
+				goto fail;
+			}
+			pool_num_buffers[bi][i] = simple_strtol(t, NULL, 10);
 
-	    t = strsep(&pool_table[bi][i], "\0");
-	    if (!t) {
-		err = -EINVAL;
-		goto fail;
-	    }
-	    pool_size[bi][i] = simple_strtoll(t, NULL, 10);
-	}
+			t = strsep(&pool_table[bi][i], "\0");
+			if (!t) {
+				err = -EINVAL;
+				goto fail;
+			}
+			pool_size[bi][i] = simple_strtoll(t, NULL, 10);
+		}
 	}
 
 fail:
@@ -2665,18 +2669,18 @@ int __init cmem_init(void)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
 	if ((err = dt_config()) == -EINVAL) {
 		__E("bad DT config\n");
-	return err;
+		return err;
 	}
 	else {
-	if (err == -ENODEV) {
-		__D("no DT config\n");
-	}
+		if (err == -ENODEV) {
+			__D("no DT config\n");
+		}
 	}
 #endif /* KERNEL_VERSION >= 3.14.0 */
 
 	if ((err = cl_config()) != 0) {
-	__E("error %d processing command line\n", err);
-	return err;
+		__E("error %d processing command line\n", err);
+		return err;
 	}
 
 	mutex_init(&cmem_mutex);
@@ -2693,8 +2697,8 @@ int __init cmem_init(void)
 	cmem_class = class_create(THIS_MODULE, "cmem");
 	if (IS_ERR(cmem_class)) {
 		__E("Error creating cmem device class.\n");
-	err = -EIO;
-	goto fail_after_reg;
+		err = -EIO;
+		goto fail_after_reg;
 	}
 
 	/* Create cmem device */
@@ -2712,155 +2716,151 @@ int __init cmem_init(void)
 				continue;
 			}
 
-		/* we know block 0 wasn't specified, ensure no pools for it */
-		if (pool_num_buffers[0][0]) {
-		__E("pools specified: must specify both phys_start and phys_end, exiting...\n");
-		err = -EINVAL;
-		goto fail_after_create;
+			/* we know block 0 wasn't specified, ensure no pools for it */
+			if (pool_num_buffers[0][0]) {
+				__E("pools specified: must specify both phys_start and phys_end, exiting...\n");
+				err = -EINVAL;
+				goto fail_after_create;
+			} else {
+				printk(KERN_INFO "no physical memory specified\n");
+
+				break;
+			}
 		}
-		else {
-		printk(KERN_INFO "no physical memory specified\n");
 
-		break;
-		}
-	}
+		length = block_end[bi] - block_start[bi];
 
-	length = block_end[bi] - block_start[bi];
-
-	if (block_start[bi] == 0) {
-		sprintf(tmp_str, "_%d", bi);
-		__E("Physical address of 0 not allowed (phys_start%s)\n",
-			bi == 0 ? "" : tmp_str);
-		__E("  (minimum physical address is %#lx)\n", PAGE_SIZE);
-		err = -EINVAL;
-		goto fail_after_create;
-	}
-
-	if (block_end[bi] < block_start[bi]) {
-		__E("phys_end (%#llx) < phys_start (%#llx)\n",
-			block_end[bi], block_start[bi]);
-		err = -EINVAL;
-		goto fail_after_create;
-	}
-
-	block_avail_size[bi] = length;
-
-	if (block_type[bi] != BLOCK_TYPE_SRAM_NODE) {
-		__D("calling request_mem_region(%#llx, %#llx, \"CMEM\")\n",
-			block_start[bi], length);
-
-		if (!request_mem_region(block_start[bi], length, "CMEM")) {
-			__E("Failed to request_mem_region(%#llx, %#llx)\n",
-				block_start[bi], length);
-			err = -EFAULT;
+		if (block_start[bi] == 0) {
+			sprintf(tmp_str, "_%d", bi);
+			__E("Physical address of 0 not allowed (phys_start%s)\n",
+			    bi == 0 ? "" : tmp_str);
+			__E("  (minimum physical address is %#lx)\n", PAGE_SIZE);
+			err = -EINVAL;
 			goto fail_after_create;
 		}
-	}
 
-	block_flags[bi] |= BLOCK_MEMREGION;
-
-	/* Allocate the pools */
-	for (i = 0; i < npools[bi]; i++) {
-		if (alloc_pool(bi, i, pool_num_buffers[bi][i], pool_size[bi][i],
-				NULL) < 0) {
-		__E("Failed to alloc pool of size 0x%llu and number of buffers %d\n", pool_size[bi][i], pool_num_buffers[bi][i]);
-		err = -ENOMEM;
-		goto fail_after_create;
+		if (block_end[bi] < block_start[bi]) {
+			__E("phys_end (%#llx) < phys_start (%#llx)\n",
+			    block_end[bi], block_start[bi]);
+			err = -EINVAL;
+			goto fail_after_create;
 		}
 
-		total_num_buffers[bi] += pool_num_buffers[bi][i];
-	}
+		block_avail_size[bi] = length;
 
-	/* use whatever is left for the heap */
-	heap_size[bi] = block_avail_size[bi] & PAGE_MASK;
-	if (heap_size[bi] > 0) {
-		err = alloc_pool(bi, npools[bi], 1, heap_size[bi], &heap_physp[bi]);
-		if (err < 0) {
-		__E("Failed to alloc heap of size %#lx\n", heap_size[bi]);
-		goto fail_after_create;
+		if (block_type[bi] != BLOCK_TYPE_SRAM_NODE) {
+			__D("calling request_mem_region(%#llx, %#llx, \"CMEM\")\n",
+			    block_start[bi], length);
+
+			if (!request_mem_region(block_start[bi], length, "CMEM")) {
+				__E("Failed to request_mem_region(%#llx, %#llx)\n",
+				    block_start[bi], length);
+				err = -EFAULT;
+				goto fail_after_create;
+			}
 		}
-		printk(KERN_INFO "allocated heap buffer %#llx of size %#lx\n",
-		   (unsigned long long)heap_physp[bi], heap_size[bi]);
-		heap_pool[bi] = npools[bi];
-		heap_head[bi].next = heap_physp[bi];
-		heap_head[bi].size = heap_size[bi];
+
+		block_flags[bi] |= BLOCK_MEMREGION;
+
+		/* Allocate the pools */
+		for (i = 0; i < npools[bi]; i++) {
+			if (alloc_pool(bi, i, pool_num_buffers[bi][i], pool_size[bi][i],
+				       NULL) < 0) {
+				__E("Failed to alloc pool of size 0x%llu and number of buffers %d\n", pool_size[bi][i], pool_num_buffers[bi][i]);
+				err = -ENOMEM;
+				goto fail_after_create;
+			}
+
+			total_num_buffers[bi] += pool_num_buffers[bi][i];
+		}
+
+		/* use whatever is left for the heap */
+		heap_size[bi] = block_avail_size[bi] & PAGE_MASK;
+		if (heap_size[bi] > 0) {
+			err = alloc_pool(bi, npools[bi], 1, heap_size[bi], &heap_physp[bi]);
+			if (err < 0) {
+				__E("Failed to alloc heap of size %#lx\n", heap_size[bi]);
+				goto fail_after_create;
+			}
+			printk(KERN_INFO "allocated heap buffer %#llx of size %#lx\n",
+			       (unsigned long long)heap_physp[bi], heap_size[bi]);
+			heap_pool[bi] = npools[bi];
+			heap_head[bi].next = heap_physp[bi];
+			heap_head[bi].size = heap_size[bi];
 
 			err = map_header((void **)&virtp, heap_physp[bi]);
-		if (err < 0) {
-			__E("Failed to alloc pool of size 0x%llu and number of buffers %d\n", pool_size[bi][i], pool_num_buffers[bi][i]);
-			err = -ENOMEM;
+			if (err < 0) {
+				__E("Failed to alloc pool of size 0x%llu and number of buffers %d\n", pool_size[bi][i], pool_num_buffers[bi][i]);
+				err = -ENOMEM;
 
-			goto fail_after_create;
-		}
+				goto fail_after_create;
+			}
 
-		header = (HeapMem_Header *)virtp;
-		header->next = 0;
-		header->size = heap_size[bi];
+			header = (HeapMem_Header *)virtp;
+			header->next = 0;
+			header->size = heap_size[bi];
 
 			unmap_header(virtp);
 
-		if (useHeapIfPoolUnavailable) {
-		printk(KERN_INFO "heap fallback enabled - will try heap if "
-			   "pool buffer is not available\n");
+			if (useHeapIfPoolUnavailable) {
+				printk(KERN_INFO "heap fallback enabled - will try heap if "
+				       "pool buffer is not available\n");
+			}
+		} else {
+			__D("no remaining memory for heap, no heap created "
+			    "for memory block %d\n", bi);
+			heap_head[bi].next = 0;
 		}
-	}
-	else {
-		__D("no remaining memory for heap, no heap created "
-			   "for memory block %d\n", bi);
-		heap_head[bi].next = 0;
-	}
 
-	__D("cmem initialized %d pools between %#llx and %#llx\n",
-		   npools[bi], block_start[bi], block_end[bi]);
+		__D("cmem initialized %d pools between %#llx and %#llx\n",
+			   npools[bi], block_start[bi], block_end[bi]);
 
-	nblocks++;
+		nblocks++;
 	}
 
 
 	if (cmem_cma_npools == 0) {
-	/* no explicit pools, assuming global CMA area */
-	__D("no CMEM CMA pools found\n");
+		/* no explicit pools, assuming global CMA area */
+		__D("no CMEM CMA pools found\n");
 
-	INIT_LIST_HEAD(&p_objs[NBLOCKS][0].busylist);
-	p_objs[NBLOCKS][0].reqsize = 0;
-	p_objs[NBLOCKS][0].size = 0;
-	p_objs[NBLOCKS][0].numbufs = 1;
+		INIT_LIST_HEAD(&p_objs[NBLOCKS][0].busylist);
+		p_objs[NBLOCKS][0].reqsize = 0;
+		p_objs[NBLOCKS][0].size = 0;
+		p_objs[NBLOCKS][0].numbufs = 1;
 
-	heap_pool[NBLOCKS] = 0;
-	npools[NBLOCKS] = 0;
-	}
-	else {
-	__D("%d CMEM CMA pools\n", cmem_cma_npools);
+		heap_pool[NBLOCKS] = 0;
+		npools[NBLOCKS] = 0;
+	} else {
+		__D("%d CMEM CMA pools\n", cmem_cma_npools);
 
-	for (i = 0; i < cmem_cma_npools; i++) {
-		INIT_LIST_HEAD(&p_objs[NBLOCKS][i].busylist);
-		p_objs[NBLOCKS][i].reqsize = cmem_cma_p_objs[i].reqsize;
-		p_objs[NBLOCKS][i].size = cmem_cma_p_objs[i].size;
-		p_objs[NBLOCKS][i].numbufs = cmem_cma_p_objs[i].numbufs;
+		for (i = 0; i < cmem_cma_npools; i++) {
+			INIT_LIST_HEAD(&p_objs[NBLOCKS][i].busylist);
+			p_objs[NBLOCKS][i].reqsize = cmem_cma_p_objs[i].reqsize;
+			p_objs[NBLOCKS][i].size = cmem_cma_p_objs[i].size;
+			p_objs[NBLOCKS][i].numbufs = cmem_cma_p_objs[i].numbufs;
 
-		cmem_cma_dev[i].coherent_dma_mask = DMA_BIT_MASK(32);
+			cmem_cma_dev[i].coherent_dma_mask = DMA_BIT_MASK(32);
 #if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
 	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
-		cmem_cma_dev[i].dma_pfn_offset = KEYSTONE_DMA_PFN_OFFSET;
+			cmem_cma_dev[i].dma_pfn_offset = KEYSTONE_DMA_PFN_OFFSET;
 #endif
-		__D("	pool %d: size=%#llx numbufs=%d\n", i,
-			p_objs[NBLOCKS][i].size, p_objs[NBLOCKS][i].numbufs);
-	}
+			__D("	pool %d: size=%#llx numbufs=%d\n", i,
+				p_objs[NBLOCKS][i].size, p_objs[NBLOCKS][i].numbufs);
+		}
 
-	if (cmem_cma_heapsize) {
-		/* already init'ed p_objs in loop above */
-		heap_pool[NBLOCKS] = cmem_cma_npools - 1;
-		npools[NBLOCKS] = cmem_cma_npools - 1;
-	}
-	else {
-		INIT_LIST_HEAD(&p_objs[NBLOCKS][cmem_cma_npools].busylist);
-		p_objs[NBLOCKS][cmem_cma_npools].reqsize = 0;
-		p_objs[NBLOCKS][cmem_cma_npools].size = 0;
-		p_objs[NBLOCKS][cmem_cma_npools].numbufs = 1;
+		if (cmem_cma_heapsize) {
+			/* already init'ed p_objs in loop above */
+			heap_pool[NBLOCKS] = cmem_cma_npools - 1;
+			npools[NBLOCKS] = cmem_cma_npools - 1;
+		} else {
+			INIT_LIST_HEAD(&p_objs[NBLOCKS][cmem_cma_npools].busylist);
+			p_objs[NBLOCKS][cmem_cma_npools].reqsize = 0;
+			p_objs[NBLOCKS][cmem_cma_npools].size = 0;
+			p_objs[NBLOCKS][cmem_cma_npools].numbufs = 1;
 
-		heap_pool[NBLOCKS] = cmem_cma_npools;
-		npools[NBLOCKS] = cmem_cma_npools;
-	}
+			heap_pool[NBLOCKS] = cmem_cma_npools;
+			npools[NBLOCKS] = cmem_cma_npools;
+		}
 	}
 
 	/* Create the /proc entry */
@@ -2917,85 +2917,85 @@ void __exit cmem_exit(void)
 	remove_proc_entry("cmem", NULL);
 
 	for (bi = 0; bi < NBLOCKS; bi++) {
-	num_pools = npools[bi];
+		num_pools = npools[bi];
 
-	if (heap_pool[bi] != -1) {
-		num_pools++;
-	}
-
-	/* Free the pool structures and empty the lists. */
-	for (i = 0; i < num_pools; i++) {
-		__D("Freeing memory associated with pool %d\n", i);
-
-		freelistp = &p_objs[bi][i].freelist;
-		busylistp = &p_objs[bi][i].busylist;
-
-		e = busylistp->next;
-		while (e != busylistp) {
-			entry = list_entry(e, struct pool_buffer, element);
-
-			__D("Warning: Freeing busy entry %d at %#llx\n",
-			    entry->id, (unsigned long long)entry->physp);
-
-			registeredlistp = &entry->users;
-			u = registeredlistp->next;
-			while (u != registeredlistp) {
-				unext = u->next;
-
-				user = list_entry(u, struct registered_user, element);
-
-				__D("Removing file 0x%p from user list of buffer %#llx...\n",
-				user->filp, (unsigned long long)entry->physp);
-
-				list_del(u);
-				kfree(user);
-
-				u = unext;
-			}
-
-			e = e->next;
-			kfree(entry);
+		if (heap_pool[bi] != -1) {
+			num_pools++;
 		}
 
-		e = freelistp->next;
-		while (e != freelistp) {
-			entry = list_entry(e, struct pool_buffer, element);
+		/* Free the pool structures and empty the lists. */
+		for (i = 0; i < num_pools; i++) {
+			__D("Freeing memory associated with pool %d\n", i);
 
-			__D("Freeing free entry %d at %#llx\n",
-			    entry->id, (unsigned long long)entry->physp);
+			freelistp = &p_objs[bi][i].freelist;
+			busylistp = &p_objs[bi][i].busylist;
 
-			registeredlistp = &entry->users;
-			u = registeredlistp->next;
-			while (u != registeredlistp) {
-				/* should never happen, but check to avoid mem leak */
-				unext = u->next;
+			e = busylistp->next;
+			while (e != busylistp) {
+				entry = list_entry(e, struct pool_buffer, element);
 
-				user = list_entry(u, struct registered_user, element);
+				__D("Warning: Freeing busy entry %d at %#llx\n",
+				    entry->id, (unsigned long long)entry->physp);
 
-				__D("Removing file 0x%p from user list of buffer %#llx...\n",
-				user->filp, (unsigned long long)entry->physp);
+				registeredlistp = &entry->users;
+				u = registeredlistp->next;
+				while (u != registeredlistp) {
+					unext = u->next;
 
-				list_del(u);
-				kfree(user);
+					user = list_entry(u, struct registered_user, element);
 
-				u = unext;
+					__D("Removing file 0x%p from user list of buffer %#llx...\n",
+					user->filp, (unsigned long long)entry->physp);
+
+					list_del(u);
+					kfree(user);
+
+					u = unext;
+				}
+
+				e = e->next;
+				kfree(entry);
 			}
 
-			e = e->next;
-			kfree(entry);
+			e = freelistp->next;
+			while (e != freelistp) {
+				entry = list_entry(e, struct pool_buffer, element);
+
+				__D("Freeing free entry %d at %#llx\n",
+				    entry->id, (unsigned long long)entry->physp);
+
+				registeredlistp = &entry->users;
+				u = registeredlistp->next;
+				while (u != registeredlistp) {
+					/* should never happen, but check to avoid mem leak */
+					unext = u->next;
+
+					user = list_entry(u, struct registered_user, element);
+
+					__D("Removing file 0x%p from user list of buffer %#llx...\n",
+					user->filp, (unsigned long long)entry->physp);
+
+					list_del(u);
+					kfree(user);
+
+					u = unext;
+				}
+
+				e = e->next;
+				kfree(entry);
+			}
 		}
-	}
 
-	length = block_end[bi] - block_start[bi];
+		length = block_end[bi] - block_start[bi];
 
-	if (block_flags[bi] & BLOCK_MEMREGION) {
-		__D("calling release_mem_region(%#llx, %#llx)...\n",
-		    block_start[bi], length);
+		if (block_flags[bi] & BLOCK_MEMREGION) {
+			__D("calling release_mem_region(%#llx, %#llx)...\n",
+			    block_start[bi], length);
 
-		if (block_type[bi] != BLOCK_TYPE_SRAM_NODE)
-			release_mem_region(block_start[bi], length);
+			if (block_type[bi] != BLOCK_TYPE_SRAM_NODE)
+				release_mem_region(block_start[bi], length);
 
-			block_flags[bi] &= ~BLOCK_MEMREGION;
+				block_flags[bi] &= ~BLOCK_MEMREGION;
 		}
 	}
 
