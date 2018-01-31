@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2014 Texas Instruments Incorporated - http://www.ti.com
+ * Copyright (c) 2007-2018 Texas Instruments Incorporated - http://www.ti.com
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -322,7 +322,7 @@ extern "C" {
 /** @ingroup    ti_CMEM */
 /*@{*/
 
-#define CMEM_VERSION    0x04140100U
+#define CMEM_VERSION    0x04150000U
 
 #define MAX_POOLS 32
 
