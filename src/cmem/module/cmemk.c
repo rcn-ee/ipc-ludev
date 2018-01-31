@@ -92,7 +92,6 @@
 #define BLOCK_TYPE_RESV_MEMORY_NODE 0
 #define BLOCK_TYPE_SRAM_NODE   1
 
-static struct vm_struct *ioremap_area;
 static unsigned int nblocks = 0;
 static unsigned int block_flags[NBLOCKS] = {0, 0, 0, 0};
 static unsigned long long block_start[NBLOCKS] = {0, 0, 0, 0};
@@ -204,7 +203,7 @@ typedef struct pool_buffer {
 	int id;
 	phys_addr_t physp;
 	int flags;			/* CMEM_CACHED or CMEM_NONCACHED */
-	void *kvirtp;		/* used only for CMA-based allocs */
+	void *kvirtp;			/* used only for CMA-based allocs or exported buffers*/
 	unsigned long long size;	/* used only for heap-based allocs */
 	struct device *dev;		/* used only for CMA-based allocs */
 	struct vm_struct *vma;
@@ -345,39 +344,31 @@ static HeapMem_Header heap_head[NBLOCKS] = {
 /* cut-and-paste above as part of adding support for more than 4 blocks */
 };
 
-static int map_header(void **vaddrp, phys_addr_t physp, struct vm_struct **vm)
+static int map_header(void **vaddrp, phys_addr_t physp)
 {
-	unsigned long vaddr;
+	void *vaddr;
 
-	*vm = __get_vm_area(PAGE_SIZE, VM_IOREMAP, VMALLOC_START, VMALLOC_END);
-	if (!*vm) {
-	__E("__get_vm_area() failed\n");
-
+	vaddr = ioremap((resource_size_t)physp, PAGE_SIZE);
+	if (vaddr == NULL) {
+		__E("map_header: ioremap(%#llx, %#llx) failed \n",
+		    (unsigned long long)physp,
+		    (unsigned long long)PAGE_SIZE);
 	return -ENOMEM;
 	}
+	*vaddrp = vaddr;
 
-	vaddr = (unsigned long)(*vm)->addr;
-    if(ioremap_page_range((unsigned long)vaddr, (unsigned long)vaddr + PAGE_SIZE,
-				       physp, PAGE_KERNEL)) {
-        __E("ioremap_page_range() failed\n");
-		free_vm_area(*vm);
-		*vm = NULL;
-		return -ENOMEM;
-	}
-	*vaddrp = (*vm)->addr;
+	__D("map_header: ioremap(%#llx, %#llx)=0x%p\n",
+	(unsigned long long)physp, (unsigned long long)PAGE_SIZE, *vaddrp);
 
-    __D("map_header: ioremap_page_range(%#llx, %#lx)=0x%p\n",
-		(unsigned long long)physp, PAGE_SIZE, *vaddrp);
 
 	return 0;
 }
 
-static void unmap_header(void *vaddr, struct vm_struct *vm)
+static void unmap_header(void *vaddr)
 {
 	__D("unmap_header: unmap_kernel_page_rage(0x%p, %#lx)\n", vaddr, PAGE_SIZE);
 
-	unmap_kernel_range_noflush((unsigned long)vaddr, PAGE_SIZE);
-	free_vm_area(vm);
+	iounmap(vaddr);
 }
 
 /*
@@ -402,9 +393,6 @@ static void unmap_header(void *vaddr, struct vm_struct *vm)
  */
 phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
 {
-	struct vm_struct *curHeader_vm_area;
-	struct vm_struct *prevHeader_vm_area;
-	struct vm_struct *newHeader_vm_area;
 	HeapMem_Header *curHeader;
 	HeapMem_Header *prevHeader;
 	HeapMem_Header *newHeader;
@@ -443,7 +431,7 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
 
 	/* Loop over the free list. */
 	while (curHeaderPhys != 0) {
-		ret_value = map_header((void **)&curHeader, curHeaderPhys, &curHeader_vm_area);
+		ret_value = map_header((void **)&curHeader, curHeaderPhys);
 		if (ret_value < 0) {
 			return 0;
 		}
@@ -475,15 +463,14 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
 
 			if (remainSize) {
 				newHeaderPhys = allocAddr + adjSize;
-				ret_value = map_header((void **)&newHeader, newHeaderPhys,
-							   &newHeader_vm_area);
+				ret_value = map_header((void **)&newHeader, newHeaderPhys);
 				if (ret_value < 0)
 					return 0;
 
 				newHeader->next = curHeader->next;
 				newHeader->size = remainSize;
 
-				unmap_header(newHeader, newHeader_vm_area);
+				unmap_header(newHeader);
 			}
 
 			/*
@@ -516,8 +503,7 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
 				 *        it is safe.
 				 */
 				if (prevHeaderPhys != 0) {
-					ret_value = map_header((void **)&prevHeader, prevHeaderPhys,
-								   &prevHeader_vm_area);
+					ret_value = map_header((void **)&prevHeader, prevHeaderPhys);
 					if (ret_value < 0)
 						return 0;
 			}
@@ -533,11 +519,11 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
 			}
 
 			if (prevHeader != &heap_head[bi]) {
-				unmap_header(prevHeader, prevHeader_vm_area);
+					unmap_header(prevHeader);
 				}
 			}
 
-			unmap_header(curHeader, curHeader_vm_area);
+			unmap_header(curHeader);
 
 			/* Success, return the allocated memory */
 			return allocAddr;
@@ -546,7 +532,7 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
 			prevHeaderPhys = curHeaderPhys;
 			curHeaderPhys = curHeader->next;
 
-			unmap_header(curHeader, curHeader_vm_area);
+			unmap_header(curHeader);
 		}
 	}
 
@@ -558,9 +544,6 @@ phys_addr_t HeapMem_alloc(int bi, size_t reqSize, size_t reqAlign, int dryrun)
  */
 void HeapMem_free(int bi, phys_addr_t block, size_t size)
 {
-	struct vm_struct *curHeader_vm_area;
-	struct vm_struct *newHeader_vm_area;
-	struct vm_struct *nextHeader_vm_area;
 	HeapMem_Header *curHeader;
 	HeapMem_Header *newHeader;
 	HeapMem_Header *nextHeader;
@@ -580,22 +563,22 @@ void HeapMem_free(int bi, phys_addr_t block, size_t size)
 
 	/* Go down freelist and find right place for buf */
 	while (nextHeaderPhys != 0 && nextHeaderPhys < newHeaderPhys) {
-		ret_value = map_header((void **)&nextHeader, nextHeaderPhys, &nextHeader_vm_area);
+		ret_value = map_header((void **)&nextHeader, nextHeaderPhys);
 		if (ret_value < 0)
 			return;
 
 		curHeaderPhys = nextHeaderPhys;
 		nextHeaderPhys = nextHeader->next;
 
-		unmap_header(nextHeader, nextHeader_vm_area);
+		unmap_header(nextHeader);
 	}
 
-	ret_value = map_header((void **)&newHeader, newHeaderPhys, &newHeader_vm_area);
+	ret_value = map_header((void **)&newHeader, newHeaderPhys);
 	if (ret_value < 0)
 		return;
 
 	if (curHeaderPhys != 0) {
-		ret_value = map_header((void **)&curHeader, curHeaderPhys, &curHeader_vm_area);
+		ret_value = map_header((void **)&curHeader, curHeaderPhys);
 		if (ret_value < 0)
 			return;
 		}
@@ -610,13 +593,13 @@ void HeapMem_free(int bi, phys_addr_t block, size_t size)
 	/* Join contiguous free blocks */
 	/* Join with upper block */
 	if (nextHeaderPhys != 0 && (newHeaderPhys + size) == nextHeaderPhys) {
-		ret_value = map_header((void **)&nextHeader, nextHeaderPhys, &nextHeader_vm_area);
+		ret_value = map_header((void **)&nextHeader, nextHeaderPhys);
 		if (ret_value < 0)
 			return;
 		newHeader->next = nextHeader->next;
 		newHeader->size += nextHeader->size;
 
-		unmap_header(nextHeader, nextHeader_vm_area);
+		unmap_header(nextHeader);
 	}
 
 	/*
@@ -629,10 +612,10 @@ void HeapMem_free(int bi, phys_addr_t block, size_t size)
 			curHeader->size += newHeader->size;
 		}
 
-		unmap_header(curHeader, curHeader_vm_area);
+		unmap_header(curHeader);
 	}
 
-	unmap_header(newHeader, newHeader_vm_area);
+	unmap_header(newHeader);
 }
 
 /* Traverses the page tables and translates a virtual address to a physical. */
@@ -1376,28 +1359,19 @@ static const struct dma_buf_ops cmem_dmabuf_ops =  {
 #endif
 };
 
-static void *map_virt_addr(phys_addr_t physp, unsigned long long size, struct vm_struct **vm)
+static void *map_virt_addr(phys_addr_t physp, unsigned long long size)
 {
 	void *vaddr;
 
-	*vm = __get_vm_area(size, VM_IOREMAP, VMALLOC_START, VMALLOC_END);
-	if (!*vm) {
-		__E("__get_vm_area() failed\n");
-
+	vaddr = ioremap((resource_size_t)physp, size);
+	if (vaddr == NULL) {
+		__E("map_virt_addr: ioremap(%#llx, %#llx) failed \n", (unsigned long long)physp,
+		    (unsigned long long)size);
 		return NULL;
 	}
 
-	vaddr = (*vm)->addr;
-	if(ioremap_page_range((unsigned long)vaddr, (unsigned long)vaddr + size,
-			      physp, PAGE_KERNEL)) {
-		__E("ioremap_page_range() failed\n");
-		free_vm_area(*vm);
-		*vm = NULL;
-		return NULL;
-	}
-
-	__D("map_virt_addr: ioremap_page_range(%#llx, %#llx)=0x%p\n",
-		(unsigned long long)physp, size, vaddr);
+	__D("map_virt_addr: ioremap(%#llx, %#llx)=0x%p\n",
+		(unsigned long long)physp, (unsigned long long)size, vaddr);
 
 	return vaddr;
 }
@@ -1418,7 +1392,7 @@ struct dma_buf *cmem_dmabuf_export(struct pool_buffer *entry, int flags)
 
 	if(entry->kvirtp == NULL) {
 		/* Map kernel virt memory */
-		entry->kvirtp = map_virt_addr(entry->physp, entry->size, &entry->vma);	
+		entry->kvirtp = map_virt_addr(entry->physp, entry->size);	
 		if ( entry->kvirtp == NULL ) {
 			__E("cmem_dmabuf_export:map_virt_addr failed\n");
 			return ERR_PTR(-EINVAL);
@@ -1786,6 +1760,11 @@ alloc:
 							  	  entry->kvirtp, entry->dma);
 					}
 					else {
+						/* Free any kernel virtual address mapping for exported buffers */
+						if(entry->kvirtp) {
+							iounmap(entry->kvirtp);
+							entry->kvirtp = NULL;
+						}
 						HeapMem_free(bi, entry->physp, (size_t)entry->size);
 						if (entry->vma) {
 							free_vm_area(entry->vma);
@@ -2365,12 +2344,17 @@ static int release(struct inode *inode, struct file *filp)
 			                      entry->kvirtp, entry->dma);
 			}
 			else {
+							/* Free any kernel virtual address mapping for exported buffers */
+							if(entry->kvirtp) {
+								iounmap(entry->kvirtp);
+								entry->kvirtp = NULL;
+							}
+
 			    HeapMem_free(bi, entry->physp, entry->size);
 			}
 			list_del(e);
 			kfree(entry);
-		    }
-		    else {
+					} else {
 			/* POOL */
 			__D("Warning: Putting 'busy' buffer from pool %d at "
 			    "%#llx on freelist\n",
@@ -2801,7 +2785,7 @@ int __init cmem_init(void)
 		heap_head[bi].next = heap_physp[bi];
 		heap_head[bi].size = heap_size[bi];
 
-		err = map_header((void **)&virtp, heap_physp[bi], &ioremap_area);
+			err = map_header((void **)&virtp, heap_physp[bi]);
 		if (err < 0) {
 			__E("Failed to alloc pool of size 0x%llu and number of buffers %d\n", pool_size[bi][i], pool_num_buffers[bi][i]);
 			err = -ENOMEM;
@@ -2813,7 +2797,7 @@ int __init cmem_init(void)
 		header->next = 0;
 		header->size = heap_size[bi];
 
-		unmap_header(virtp, ioremap_area);
+			unmap_header(virtp);
 
 		if (useHeapIfPoolUnavailable) {
 		printk(KERN_INFO "heap fallback enabled - will try heap if "
