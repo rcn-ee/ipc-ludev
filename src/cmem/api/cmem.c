@@ -532,7 +532,7 @@ off64_t CMEM_getPhys64(void *ptr)
     }
 
     getDesc.virtp = ptr;
-    if (ioctl(cmem_fd, CMEM_IOCGETPHYS | CMEM_IOCMAGIC, &getDesc) == -1) {
+    if (ioctl(cmem_fd, CMEM_IOCGETPHYS | CMEM_IOCMAGIC, &getDesc) != 0) {
         __E("getPhys64: Failed to get physical address of %#x\n",
             (unsigned int)ptr);
         return 0;
@@ -559,7 +559,7 @@ int CMEM_freePhys64(off64_t physp, CMEM_AllocParams *params)
 	return -1;
     }
 
-    if (ioctl(cmem_fd, CMEM_IOCFREEPHYS | CMEM_IOCMAGIC, &physp) == -1) {
+    if (ioctl(cmem_fd, CMEM_IOCFREEPHYS | CMEM_IOCMAGIC, &physp) != 0) {
 	__E("freePhys64: Failed to free buffer at physical address %#llx\n",
 	    (unsigned long long)physp);
 
@@ -723,7 +723,7 @@ int CMEM_free(void *ptr, CMEM_AllocParams *params)
 
     freeDesc.virtp = ptr;
     cmd = CMEM_IOCFREE | params->type;
-    if (ioctl(cmem_fd, cmd | CMEM_IOCMAGIC, &freeDesc) == -1) {
+    if (ioctl(cmem_fd, cmd | CMEM_IOCMAGIC, &freeDesc) != 0) {
         __E("free: failed to free %#x\n", (unsigned int) ptr);
         return -1;
     }
