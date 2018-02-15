@@ -631,26 +631,28 @@ static phys_addr_t get_phys(void *virtp)
 		physp = virt_to_phys(virtp);
 		__D("get_phys: virt_to_phys translated direct-mapped %#lx to %#llx\n",
 		    virt, (unsigned long long)physp);
+		return(physp);
 	}
+
 	down_read(&current->mm->mmap_sem);
 	vma = find_vma(mm, virt);
-	up_read(&current->mm->mmap_sem);
 	/* this will catch, kernel-allocated, mmaped-to-usermode addresses */
 	if (vma  &&
 	    (vma->vm_flags & VM_IO) &&
 	    (vma->vm_pgoff)) {
-		physp = ((unsigned long long)vma->vm_pgoff << PAGE_SHIFT) +
+		physp = (((unsigned long long)vma->vm_pgoff) << PAGE_SHIFT) +
 			(virt - vma->vm_start);
+		up_read(&current->mm->mmap_sem);
 		__D("get_phys: find_vma translated user %#lx to %#llx\n", virt,
 		    (unsigned long long)physp);
+		return(physp);
 	}
 
 	/* otherwise, use get_user_pages() for general userland pages */
-	else {
+	{
 		int res, nr_pages = 1;
 		struct page *pages;
 
-		down_read(&current->mm->mmap_sem);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0))
 		res = get_user_pages_remote(current, current->mm, virt, nr_pages,
 					    FOLL_WRITE, &pages, NULL, NULL);
@@ -1685,8 +1687,7 @@ alloc:
 			__D("FREE%s: translated 0x%p user virtual to %#llx physical\n",
 			    cmd & CMEM_HEAP ? "HEAP" : "",
 			    virtp, (unsigned long long)physp);
-			}
-			else {
+		} else {
 				virtp = 0L;	/* silence the compiler warning */
 				if (copy_from_user(&physArg, llargp,
 				    sizeof(unsigned long long))) {
