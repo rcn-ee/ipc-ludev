@@ -2259,6 +2259,7 @@ static int open(struct inode *inode, struct file *filp)
 	__D("open: called.\n");
 
 	atomic_inc(&reference_count);
+	filp->f_mode |= FMODE_UNSIGNED_OFFSET;
 
 	return 0;
 }
