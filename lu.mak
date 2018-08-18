@@ -33,6 +33,8 @@
 
 include products.mak
 
+ARCH ?= arm
+
 .PHONY: config config-static config-shared module modules_install modules_clean
 
 config:
@@ -51,7 +53,7 @@ config-shared:
             CC=$(TOOLCHAIN_PREFIX)gcc
 
 module:
-	$(MAKE) -C src/cmem/module ARCH=arm
+	$(MAKE) -C src/cmem/module ARCH=$(ARCH)
 
 modules_install:
 	$(MAKE) -C src/cmem/module install
