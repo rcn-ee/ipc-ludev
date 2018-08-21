@@ -322,7 +322,7 @@ extern "C" {
 /** @ingroup    ti_CMEM */
 /*@{*/
 
-#define CMEM_VERSION    0x04150001U
+#define CMEM_VERSION    0x04150002U
 
 #define MAX_POOLS 32
 
