@@ -248,6 +248,9 @@ static struct device *cmem_cma_dev_0;
 #define KEYSTONE_DMA_PFN_OFFSET 0x780000UL
 #endif
 
+#if IS_ENABLED(CONFIG_ARCH_K3)
+#define DISABLE_CACHE_OPERATIONS
+#else
 #if !defined(dmac_map_area)
 #if !defined(MULTI_CACHE)
 /* Add prototypes for dmac_map_area */
@@ -255,6 +258,8 @@ static struct device *cmem_cma_dev_0;
 void dmac_map_area(const void *, size_t, int);
 #endif
 #endif
+#endif
+
 /*
  * For CMA allocations we treat p_objs[NBLOCKS] as a special "pool" array.
  */
@@ -847,7 +852,10 @@ void *find_buffer_n(struct seq_file *s, int n)
 				busy_empty = 0;
 				if (count == n) {
 					found = 1;
-					s->private = (void *)((int)s->private | BUSY_ENTRY);
+					s->private =
+					    (void *)
+					    ((uintptr_t)s->private
+					     | BUSY_ENTRY);
 
 					break;
 				}
@@ -870,7 +878,10 @@ void *find_buffer_n(struct seq_file *s, int n)
 				}
 				if (count == n) {
 					found = 1;
-					s->private = (void *)((int)s->private | FREE_ENTRY);
+					s->private =
+					    (void *)
+					    ((uintptr_t)s->private
+					     | FREE_ENTRY);
 
 					break;
 				}
@@ -891,13 +902,18 @@ void *find_buffer_n(struct seq_file *s, int n)
 	}
 	else {
 		if (busy_empty) {
-			s->private = (void *)((int)s->private | SHOW_BUSY_BANNER);
+			s->private = (void *)
+				     ((uintptr_t)s->private
+				      | SHOW_BUSY_BANNER);
 		}
 		if (free_empty) {
-			s->private = (void *)((int)s->private | SHOW_PREV_FREE_BANNER);
+			s->private = (void *)
+				     ((uintptr_t)s->private
+				      | SHOW_PREV_FREE_BANNER);
 		}
 		if (count == (total_num_buffers[bi] - 1)) {
-			s->private = (void *)((int)s->private | SHOW_LAST_FREE_BANNER);
+			s->private = (void *)((uintptr_t)s->private
+					      | SHOW_LAST_FREE_BANNER);
 		}
 	}
 
@@ -993,7 +1009,8 @@ static int cmem_seq_show(struct seq_file *s, void *v)
 		for (i = 0; i < npools[bi]; i++) {
 			if (listp == p_objs[bi][i].busylist.next) {
 				/* first buffer in busylist */
-				if ((int)s->private & SHOW_PREV_FREE_BANNER) {
+				if ((uintptr_t)s->private
+				    & SHOW_PREV_FREE_BANNER) {
 					/*
 					 * Previous pool's freelist empty, need to show banner.
 					 */
@@ -1005,14 +1022,16 @@ static int cmem_seq_show(struct seq_file *s, void *v)
 			}
 			if (listp == p_objs[bi][i].freelist.next) {
 				/* first buffer in freelist */
-				if ((int)s->private & SHOW_PREV_FREE_BANNER) {
+				if ((uintptr_t)s->private
+				    & SHOW_PREV_FREE_BANNER) {
 					/*
 					 * Previous pool's freelist & this pool's busylist empty,
 					 * need to show banner.
 					 */
 					show_free_banner(s, i - 1);
 				}
-				if ((int)s->private & SHOW_BUSY_BANNER) {
+				if ((uintptr_t)s->private
+				    & SHOW_BUSY_BANNER) {
 					/*
 					 * This pool's busylist empty, need to show banner.
 					 */
@@ -1027,7 +1046,7 @@ static int cmem_seq_show(struct seq_file *s, void *v)
 
 	entry = list_entry(e, struct pool_buffer, element);
 
-	if ((int)s->private & BUSY_ENTRY) {
+	if ((uintptr_t)s->private & BUSY_ENTRY) {
 		attr = entry->flags & CMEM_CACHED ? "(cached)" : "(noncached)";
 		seq_printf(s, "id %d: phys addr %#llx %s\n", entry->id,
 			   (unsigned long long)entry->physp, attr);
@@ -1037,8 +1056,8 @@ static int cmem_seq_show(struct seq_file *s, void *v)
 			   (unsigned long long)entry->physp);
 	}
 
-	if ((int)s->private & BUSY_ENTRY &&
-		(int)s->private & SHOW_LAST_FREE_BANNER) {
+	if ((uintptr_t)s->private & BUSY_ENTRY &&
+		(uintptr_t)s->private & SHOW_LAST_FREE_BANNER) {
 
 		/* FIXME */
 		show_free_banner(s, npools[0] - 1);
@@ -1063,7 +1082,8 @@ static int cmem_proc_open(struct inode *inode, struct file *file)
 }
 
 /* Allocate a contiguous memory pool. */
-static int alloc_pool(int bi, int idx, int num, unsigned long long reqsize, phys_addr_t *physpRet)
+static int alloc_pool(int bi, int idx, int num, unsigned long long reqsize,
+		      phys_addr_t *physpRet)
 {
 	struct pool_buffer *entry;
 	struct list_head *freelistp = &p_objs[bi][idx].freelist;
@@ -1142,8 +1162,10 @@ static int mmap_buffer(struct pool_buffer *entry, struct vm_area_struct *vma,
 	}
 
 	if (entry->flags & CMEM_CACHED) {
+#ifndef DISABLE_CACHE_OPERATIONS
 		vma->vm_page_prot = __pgprot(pgprot_val(vma->vm_page_prot) |
 			(L_PTE_MT_WRITEALLOC | L_PTE_MT_BUFFERABLE));
+#endif
 	}
 	else {
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
@@ -1213,6 +1235,7 @@ static void cmem_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 
 #endif
 {
+#ifndef DISABLE_CACHE_OPERATIONS
 	struct pool_buffer *entry = dmabuf->priv;
 
 	if ( entry->kvirtp )
@@ -1220,6 +1243,7 @@ static void cmem_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 	/* TODO: Need to take care of case where kvirtp is not set */
 
 	outer_clean_range(entry->physp, entry->physp + entry->size);
+#endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0))
 	return 0;
@@ -1274,7 +1298,8 @@ static struct sg_table *cmem_map_dma_buf(struct dma_buf_attachment *attach,
 
 	sg_init_table(sgt->sgl, 1);
 	sg_dma_len(sgt->sgl) = entry->size;
-	sg_set_page(sgt->sgl, pfn_to_page(PFN_DOWN(entry->physp)), entry->size, 0);
+	sg_set_page(sgt->sgl, pfn_to_page(PFN_DOWN(entry->physp)),
+		    entry->size, 0);
 	sg_dma_address(sgt->sgl) = entry->physp;
 
 	/* dma sync buffer */
@@ -1306,6 +1331,7 @@ static void cmem_unmap_dma_buf(struct dma_buf_attachment *attach,
 static int cmem_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
 					 enum dma_data_direction direction)
 {
+#ifndef DISABLE_CACHE_OPERATIONS
 	struct pool_buffer *entry = dmabuf->priv;
 
 	outer_inv_range(entry->physp, entry->physp + entry->size);
@@ -1313,7 +1339,7 @@ static int cmem_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
 		dmac_map_area(entry->kvirtp, entry->size, direction);
 
 	/* TODO: Need to take care of case where kvirtp is not set */
-
+#endif
 	return 0;
 }
 
@@ -1367,7 +1393,9 @@ static void *map_virt_addr(phys_addr_t physp, unsigned long long size)
 
 	vaddr = ioremap((resource_size_t)physp, size);
 	if (vaddr == NULL) {
-		__E("map_virt_addr: ioremap(%#llx, %#llx) failed \n", (unsigned long long)physp,
+		__E("%s: ioremap(%#llx, %#llx) failed\n",
+		    __func__,
+		    (unsigned long long)physp,
 		    (unsigned long long)size);
 		return NULL;
 	}
@@ -1525,12 +1553,13 @@ alloc:
 			physp = HeapMem_alloc(bi, size, align, ALLOCRUN);
 			entry->kvirtp = NULL;
 			/* set only for test just below here */
-			virtp = (void *)(unsigned int)physp;
+			virtp = (void *)(uintptr_t)physp;
 		}
 
 		if (virtp == NULL) {
-			__E("ioctl: failed to allocate heap buffer of size %#x\n",
-			    size);
+			__E(
+			    "ioctl: failed to allocate from block %d: heap buffer of size %zx\n",
+			    bi, size);
 
 			mutex_unlock(&cmem_mutex);
 			kfree(entry);
@@ -1750,10 +1779,12 @@ alloc:
 						 * HeapMem_free()
 						 */
 						virtp_end = virtp + size;
+#ifndef DISABLE_CACHE_OPERATIONS
 						outer_inv_range(physp, physp + size);
 						dmac_map_area(virtp, size, DMA_FROM_DEVICE);
 						__D("FREEHEAP: invalidated user virtual "
 						    "0x%p -> 0x%p\n", virtp, virtp_end);
+#endif
 					}
 
 					if (bi == NBLOCKS) {
@@ -1971,9 +2002,10 @@ alloc:
 		break;
 
 	case CMEM_IOCCACHEWBINVALL:
+#ifndef DISABLE_CACHE_OPERATIONS
 		flush_cache_all();
 		__D("CACHEWBINVALL: flush all cache\n");
-
+#endif
 		break;
 
 	case CMEM_IOCCACHE:
@@ -2028,29 +2060,34 @@ alloc:
 
 		switch (cmd & ~CMEM_IOCMAGIC) {
 		case CMEM_IOCCACHEWB:
+#ifndef DISABLE_CACHE_OPERATIONS
 			dmac_map_area(virtp, block.size, DMA_TO_DEVICE);
 			outer_clean_range(physp, physp + block.size);
 
 			__D("CACHEWB: cleaned user virtual 0x%p -> 0x%p\n",
 			    virtp, virtp_end);
+#endif
 
 			break;
 
 		case CMEM_IOCCACHEINV:
+#ifndef DISABLE_CACHE_OPERATIONS
 			outer_inv_range(physp, physp + block.size);
 			dmac_map_area(virtp, block.size, DMA_FROM_DEVICE);
 
 			__D("CACHEINV: invalidated user virtual 0x%p -> 0x%p\n",
 			    virtp, virtp_end);
-
+#endif
 			break;
 
 		case CMEM_IOCCACHEWBINV:
+#ifndef DISABLE_CACHE_OPERATIONS
 			dmac_map_area(virtp, block.size, DMA_BIDIRECTIONAL);
 			outer_flush_range(physp, physp + block.size);
 
 			__D("CACHEWBINV: flushed user virtual 0x%p -> 0x%p\n",
 			    virtp, virtp_end);
+#endif
 
 			break;
 		}
@@ -3014,6 +3051,7 @@ MODULE_LICENSE("GPL");
 module_init(cmem_init);
 module_exit(cmem_exit);
 
+#ifndef DISABLE_CACHE_OPERATIONS
 #if  !defined(dmac_map_range)
 
 #if !defined(MULTI_CACHE)
@@ -3276,3 +3314,5 @@ v7_dma_unmap_area:\n \
 #endif /* !defined(MULTI_CACHE) */
 
 #endif /* dmac_map_range */
+
+#endif /* DISABLE_CACHE_OPERATIONS */
