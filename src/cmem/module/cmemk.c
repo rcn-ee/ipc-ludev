@@ -1250,9 +1250,14 @@ static void cmem_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 #endif
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 18, 0))
 static int cmem_dmabuf_map_attach(struct dma_buf *dma_buf,
 			      struct device *target_dev,
 			      struct dma_buf_attachment *attach)
+#else
+static int cmem_dmabuf_map_attach(struct dma_buf *dma_buf,
+			      struct dma_buf_attachment *attach)
+#endif
 {
 	struct cmem_dmabuf_attachment *cmem_dmabuf_attach;
 
@@ -1380,8 +1385,10 @@ static const struct dma_buf_ops cmem_dmabuf_ops =  {
 	.kmap = cmem_dma_buf_kmap,
 	.kunmap = cmem_dma_buf_kunmap,
 #else
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 18, 0))
 	.map_atomic = cmem_dma_buf_kmap,
 	.unmap_atomic = cmem_dma_buf_kunmap,
+#endif
 	.map = cmem_dma_buf_kmap,
 	.unmap = cmem_dma_buf_kunmap,
 #endif
