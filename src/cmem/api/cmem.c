@@ -172,7 +172,7 @@ static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params, of
 	    cmd == CMEM_IOCALLOC ? "CMEM_IOCALLOC" : "CMEM_IOCALLOCCACHED",
 	    poolid, rv);
 	if (physp) {
-	    *physp = (unsigned int)NULL;
+	    *physp = (off_t)0;
 	}
 
         return NULL;
@@ -254,7 +254,7 @@ static void *getAndAllocFromPool(int blockid, unsigned long long size, CMEM_Allo
 
     if (poolid == -1) {
 	if (physp) {
-	    *physp = (unsigned int)NULL;
+	    *physp = (off_t)0;
 	}
 
 	return NULL;
@@ -292,7 +292,7 @@ static void *allocFromHeap(int blockid, size_t size, CMEM_AllocParams *params, o
 	           "CMEM_IOCALLOCHEAP" : "CMEM_IOCALLOCHEAPCACHED",
 	    rv);
 	if (physp) {
-	    *physp = (unsigned int)NULL;
+	    *physp = (off_t)0;
 	}
 
         return NULL;
@@ -377,7 +377,7 @@ static void *alloc(int blockid, size_t size, CMEM_AllocParams *params, off_t *ph
 
     if (!validate_init()) {
 	if (physp) {
-	    *physp = (unsigned int)NULL;
+	    *physp = (off_t)0;
 	}
 
 	return NULL;
@@ -533,8 +533,8 @@ off64_t CMEM_getPhys64(void *ptr)
 
     getDesc.virtp = ptr;
     if (ioctl(cmem_fd, CMEM_IOCGETPHYS | CMEM_IOCMAGIC, &getDesc) != 0) {
-        __E("getPhys64: Failed to get physical address of %#x\n",
-            (unsigned int)ptr);
+        __E("getPhys64: Failed to get physical address of %p\n",
+            ptr);
         return 0;
     }
 
@@ -665,7 +665,7 @@ static void *allocPool(int blockid, int poolid, CMEM_AllocParams *params, off_t 
 
     if (!validate_init()) {
 	if (physp) {
-	    *physp = (unsigned int)NULL;
+	    *physp = (off_t)0;
 	}
 
 	return NULL;
@@ -724,7 +724,7 @@ int CMEM_free(void *ptr, CMEM_AllocParams *params)
     freeDesc.virtp = ptr;
     cmd = CMEM_IOCFREE | params->type;
     if (ioctl(cmem_fd, cmd | CMEM_IOCMAGIC, &freeDesc) != 0) {
-        __E("free: failed to free %#x\n", (unsigned int) ptr);
+        __E("free: failed to free %p\n", ptr);
         return -1;
     }
     size = freeDesc.free_outparams.size;
@@ -733,7 +733,7 @@ int CMEM_free(void *ptr, CMEM_AllocParams *params)
         params->type == CMEM_POOL ? "POOL" : "HEAP", size);
 
     if (munmap(ptr, size) == -1) {
-        __E("free: failed to munmap %#x\n", (unsigned int) ptr);
+        __E("free: failed to munmap %p\n", ptr);
         return -1;
     }
 
@@ -779,8 +779,8 @@ int CMEM_export_dmabuf(void *ptr)
 
     dmabuf_desc.virtp = ptr;
     if (ioctl(cmem_fd, CMEM_IOCEXPORTDMABUF | CMEM_IOCMAGIC, &dmabuf_desc) == -1) {
-        __E("export_dmabuf: Failed to export to dmabuf %#x\n",
-            (unsigned int)ptr);
+        __E("export_dmabuf: Failed to export to dmabuf %p\n",
+            ptr);
         return -1;
     }
 
@@ -844,8 +844,8 @@ off_t CMEM_getPhys(void *ptr)
 
     getDesc.virtp = ptr;
     if (ioctl(cmem_fd, CMEM_IOCGETPHYS | CMEM_IOCMAGIC, &getDesc) == -1) {
-        __E("getPhys: Failed to get physical address of %#x\n",
-            (unsigned int)ptr);
+        __E("getPhys: Failed to get physical address of %p\n",
+            ptr);
         return 0;
     }
 
@@ -887,7 +887,7 @@ int CMEM_cacheWb(void *ptr, size_t size)
     block.addr = ptr;
     block.size = size;
     if (ioctl(cmem_fd, CMEM_IOCCACHEWB | CMEM_IOCMAGIC, &block) == -1) {
-        __E("cacheWb: Failed to writeback %#x\n", (unsigned int) ptr);
+        __E("cacheWb: Failed to writeback %p\n", ptr);
 
         return -1;
     }
@@ -910,8 +910,8 @@ int CMEM_cacheWbInv(void *ptr, size_t size)
     block.addr = ptr;
     block.size = size;
     if (ioctl(cmem_fd, CMEM_IOCCACHEWBINV | CMEM_IOCMAGIC, &block) == -1) {
-        __E("cacheWbInv: Failed to writeback & invalidate %#x\n",
-            (unsigned int) ptr);
+        __E("cacheWbInv: Failed to writeback & invalidate %p\n",
+            ptr);
 
         return -1;
     }
@@ -934,7 +934,7 @@ int CMEM_cacheInv(void *ptr, size_t size)
     block.addr = ptr;
     block.size = size;
     if (ioctl(cmem_fd, CMEM_IOCCACHEINV | CMEM_IOCMAGIC, &block) == -1) {
-        __E("cacheInv: Failed to invalidate %#x\n", (unsigned int) ptr);
+        __E("cacheInv: Failed to invalidate %p\n", ptr);
 
         return -1;
     }
