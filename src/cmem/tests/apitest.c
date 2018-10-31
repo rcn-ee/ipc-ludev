@@ -332,19 +332,19 @@ void testCache(size_t size, int block)
     ptr1_nocache = CMEM_alloc2(block, size, NULL);
 
     if (ptr1_nocache == NULL) {
-        fprintf(stderr, "Failed to allocate buffer of size %d\n", size);
+        fprintf(stderr, "Failed to allocate buffer of size 0x%zx\n", size);
         goto cleanup;
     }
 
-    printf("Allocated buffer of size %d at address %#x.\n", size,
-           (unsigned int) ptr1_nocache);
+    printf("Allocated buffer of size 0x%zx at address %p.\n", size,
+           ptr1_nocache);
 
     /* Find out and print the physical address of this buffer */
     physp_nocache = CMEM_getPhys(ptr1_nocache);
 
     if (physp_nocache == 0) {
-        fprintf(stderr, "Failed to get physical address of buffer %#x\n",
-                (unsigned int) ptr1_nocache);
+        fprintf(stderr, "Failed to get physical address of buffer %p\n",
+                ptr1_nocache);
         goto cleanup;
     }
 
@@ -364,19 +364,19 @@ void testCache(size_t size, int block)
     ptr1_cache = CMEM_alloc2(block, size, &params);
 
     if (ptr1_cache == NULL) {
-        fprintf(stderr, "Failed to allocate buffer of size %d\n", size);
+        fprintf(stderr, "Failed to allocate buffer of size 0x%zx\n", size);
         goto cleanup;
     }
 
-    printf("Allocated buffer of size %d at address %#x.\n", size,
-           (unsigned int)ptr1_cache);
+    printf("Allocated buffer of size 0x%zx at address %p.\n", size,
+           ptr1_cache);
 
     /* Find out and print the physical address of this buffer */
     physp_cache = CMEM_getPhys(ptr1_cache);
 
     if (physp_cache == 0) {
-        fprintf(stderr, "Failed to get physical address of buffer %#x\n",
-                (unsigned int)ptr1_cache);
+        fprintf(stderr, "Failed to get physical address of buffer %p\n",
+                ptr1_cache);
         goto cleanup;
     }
 
@@ -394,19 +394,19 @@ void testCache(size_t size, int block)
     ptr1_dma = CMEM_alloc2(block, size, NULL);
 
     if (ptr1_dma == NULL) {
-        fprintf(stderr, "Failed to allocate buffer of size %d\n", size);
+        fprintf(stderr, "Failed to allocate buffer of size 0x%zx\n", size);
         goto cleanup;
     }
 
-    printf("Allocated buffer of size %d at address %#x.\n", size,
-           (unsigned int)ptr1_dma);
+    printf("Allocated buffer of size 0x%zx at address %p.\n", size,
+           ptr1_dma);
 
     /* Find out and print the physical address of this buffer */
     physp_dma = CMEM_getPhys(ptr1_dma);
 
     if (physp_dma == 0) {
-        fprintf(stderr, "Failed to get physical address of buffer %#x\n",
-                (unsigned int)ptr1_dma);
+        fprintf(stderr, "Failed to get physical address of buffer %p\n",
+                ptr1_dma);
         goto cleanup;
     }
 
@@ -484,28 +484,28 @@ void testCache(size_t size, int block)
     poolid = CMEM_getPool2(block, size);
 
     if (poolid == -1) {
-        fprintf(stderr, "Failed to get a pool which fits size %d\n", size);
+        fprintf(stderr, "Failed to get a pool which fits size 0x%zx\n", size);
         goto cleanup;
     }
 
-    printf("Got a pool (%d) that fits the size %d\n", poolid, size);
+    printf("Got a pool (%d) that fits the size 0x%zx\n", poolid, size);
 
     ptr2 = CMEM_allocPool2(block, poolid, NULL);
 
     if (ptr2 == NULL) {
-        fprintf(stderr, "Failed to allocate buffer of size %d\n", size);
+        fprintf(stderr, "Failed to allocate buffer of size 0x%zx\n", size);
         goto cleanup;
     }
 
-    printf("Allocated buffer of size %d at address %#x.\n", size,
-           (unsigned int)ptr2);
+    printf("Allocated buffer of size 0x%zx at address %p.\n", size,
+           ptr2);
 
     /* Find out and print the physical address of this buffer */
     physp = CMEM_getPhys(ptr2);
 
     if (physp == 0) {
-        fprintf(stderr, "Failed to get physical address of buffer %#x\n",
-                (unsigned int)ptr2);
+        fprintf(stderr, "Failed to get physical address of buffer %p\n",
+                ptr2);
         goto cleanup;
     }
 
@@ -528,38 +528,38 @@ void testCache(size_t size, int block)
 cleanup:
     if (ptr1_nocache != NULL) {
 	if (CMEM_free(ptr1_nocache, NULL) < 0) {
-	    fprintf(stderr, "Failed to free buffer at %#x\n",
-		    (unsigned int)ptr1_nocache);
+	    fprintf(stderr, "Failed to free buffer at %p\n",
+		    ptr1_nocache);
 	}
-	printf("Successfully freed buffer at %#x.\n",
-	       (unsigned int)ptr1_nocache);
+	printf("Successfully freed buffer at %p.\n",
+	       ptr1_nocache);
     }
 
     if (ptr1_cache != NULL) {
 	if (CMEM_free(ptr1_cache, &params) < 0) {
-	    fprintf(stderr, "Failed to free buffer at %#x\n",
-		    (unsigned int)ptr1_cache);
+	    fprintf(stderr, "Failed to free buffer at %p\n",
+		    ptr1_cache);
 	}
-	printf("Successfully freed buffer at %#x.\n",
-	       (unsigned int)ptr1_cache);
+	printf("Successfully freed buffer at %p.\n",
+	       ptr1_cache);
     }
 
     if (ptr1_dma != NULL) {
 	if (CMEM_free(ptr1_dma, NULL) < 0) {
-	    fprintf(stderr, "Failed to free buffer at %#x\n",
-		    (unsigned int)ptr1_dma);
+	    fprintf(stderr, "Failed to free buffer at %p\n",
+		    ptr1_dma);
 	}
-	printf("Successfully freed buffer at %#x.\n",
-	       (unsigned int)ptr1_dma);
+	printf("Successfully freed buffer at %p.\n",
+	       ptr1_dma);
     }
 
     if (ptr2 != NULL) {
 	if (CMEM_free(ptr2, NULL) < 0) {
-	    fprintf(stderr, "Failed to free buffer at %#x\n",
-		    (unsigned int)ptr2);
+	    fprintf(stderr, "Failed to free buffer at %p\n",
+		    ptr2);
 	}
-	printf("Successfully freed buffer at %#x.\n",
-	       (unsigned int)ptr2);
+	printf("Successfully freed buffer at %p.\n",
+	       ptr2);
     }
 }
 
@@ -598,7 +598,7 @@ int testMap(size_t size)
 	goto cleanup;
     }
     else {
-	printf("testMap: remapped physp %#llx to %p\n",
+	printf("testMap: remapped physp %#zx to %p\n",
 		physp, map_ptr);
 	printf("    *map_ptr = 0x%x\n", *map_ptr);
     }
@@ -619,7 +619,7 @@ int testMap(size_t size)
 	printf("testMap: original pointer still good\n");
     }
 
-    printf("testMap: trying to map too much (0x%x)...\n", size * 0x10);
+    printf("testMap: trying to map too much (0x%zx)...\n", size * 0x10);
 #if defined(LINUXUTILS_BUILDOS_ANDROID)
     map_ptr = CMEM_map64(physp, size * 0x10);
 #else
@@ -664,7 +664,7 @@ int testAllocPhys(size_t size)
         goto cleanup;
     }
     else {
-        printf("testAllocPhys: mapped physp %#llx to %p\n",
+        printf("testAllocPhys: mapped physp %#zx to %p\n",
                physp, map_ptr);
     }
 
@@ -680,7 +680,7 @@ int testAllocPhys(size_t size)
     printf("    unmapping %p\n", map_ptr);
     CMEM_unmap(map_ptr, size);
 
-    printf("testAllocPhys: trying to map too much (0x%x)...\n", size * 0x10);
+    printf("testAllocPhys: trying to map too much (0x%zx)...\n", size * 0x10);
 #if defined(LINUXUTILS_BUILDOS_ANDROID)
     map_ptr = CMEM_map64(physp, size * 0x10);
 #else
