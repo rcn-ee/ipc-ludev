@@ -42,6 +42,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #include <ti/cmem.h>
 
@@ -72,8 +73,8 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    printf("Allocated buffer of size %d at virtual address %#x.\n", BUFSIZE,
-           (unsigned int) ptr);
+    printf("Allocated buffer of size %d at virtual address %p.\n", BUFSIZE,
+           ptr);
 
     orig = ptr;
 
@@ -83,13 +84,13 @@ int main(int argc, char *argv[])
         physp = CMEM_getPhys(ptr);
 
         if (physp == 0) {
-            fprintf(stderr, "Failed to get physical address of %#x\n",
-                    (unsigned int) ptr);
+            fprintf(stderr, "Failed to get physical address of %p\n",
+                    ptr);
             goto cleanup;
         }
 
-        printf("virtual=%#x physical=%#llx\n", (unsigned int) ptr,
-                                               (unsigned long long) physp);
+        printf("virtual=%p physical=%zx\n", ptr,
+               physp);
 
         ptr += inc;
     }
@@ -101,13 +102,13 @@ int main(int argc, char *argv[])
         physp = CMEM_getPhys(ptr);
 
         if (physp == 0) {
-            fprintf(stderr, "Failed to get physical address of %#x\n",
-                    (unsigned int) ptr);
+            fprintf(stderr, "Failed to get physical address of %p\n",
+                    ptr);
             goto cleanup;
         }
 
-        printf("virtual=%#x physical=%#llx\n", (unsigned int) ptr,
-                                               (unsigned long long) physp);
+        printf("virtual=%p physical=%zx\n", ptr,
+               physp);
 
         ptr += inc;
     }
@@ -119,13 +120,13 @@ int main(int argc, char *argv[])
         physp = CMEM_getPhys(ptr);
 
         if (physp == 0) {
-            fprintf(stderr, "Failed to get physical address of %#x\n",
-                    (unsigned int) ptr);
+            fprintf(stderr, "Failed to get physical address of %p\n",
+                    ptr);
             goto cleanup;
         }
 
-        printf("virtual=%#x physical=%#llx\n", (unsigned int) ptr,
-                                               (unsigned long long) physp);
+        printf("virtual=%p physical=%zx\n", ptr,
+               physp);
 
         ptr += inc;
     }
@@ -137,13 +138,13 @@ int main(int argc, char *argv[])
         physp = CMEM_getPhys(ptr);
 
         if (physp == 0) {
-            fprintf(stderr, "Failed to get physical address of %#x\n",
-                    (unsigned int) ptr);
+            fprintf(stderr, "Failed to get physical address of %p\n",
+                    ptr);
             goto cleanup;
         }
 
-        printf("virtual=%#x physical=%#llx\n", (unsigned int) ptr,
-                                               (unsigned long long) physp);
+        printf("virtual=%p physical=%zx\n", ptr,
+               physp);
 
         ptr += inc;
     }
@@ -151,11 +152,11 @@ int main(int argc, char *argv[])
 cleanup:
     ptr = orig;
     if (CMEM_free(ptr, NULL) < 0) {
-        fprintf(stderr, "Failed to free buffer at %#x\n",
-                (unsigned int) ptr);
+        fprintf(stderr, "Failed to free buffer at %p\n",
+                ptr);
     }
 
-    printf("Successfully freed buffer at %#x.\n", (unsigned int) ptr);
+    printf("Successfully freed buffer at %p.\n", ptr);
 
     if (CMEM_exit() < 0) {
         fprintf(stderr, "Failed to finalize the CMEM module\n");

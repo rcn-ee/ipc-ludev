@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    printf("Process %d: Allocated buffer at %#x\n", pid, (unsigned int) ptr);
+    printf("Process %d: Allocated buffer at %p\n", pid, ptr);
 
     /* Write some data into this buffer */
     for (i=0; i < BUFFER_SIZE / sizeof(int) ; i++) {
@@ -123,11 +123,11 @@ int main(int argc, char *argv[])
     sleep(r);
 
     if (pid % 2) {
-	printf("Process %d: Freeing buffer at %#x\n", pid, (unsigned int) ptr);
+	printf("Process %d: Freeing buffer at %p\n", pid, ptr);
 
 	if (CMEM_free(ptr, NULL) < 0) {
-	    fprintf(stderr, "Process %d: Failed to free buffer at %#x\n",
-		    pid, (unsigned int) ptr);
+	    fprintf(stderr, "Process %d: Failed to free buffer at %p\n",
+		    pid, ptr);
 	}
     }
     else {
