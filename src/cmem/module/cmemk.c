@@ -645,11 +645,11 @@ static phys_addr_t get_phys(void *virtp)
 	if (vma  &&
 	    (vma->vm_flags & VM_IO) &&
 	    (vma->vm_pgoff)) {
-		physp = (((unsigned long long)vma->vm_pgoff) << PAGE_SHIFT) +
+		physp = (((phys_addr_t)vma->vm_pgoff) << PAGE_SHIFT) +
 			(virt - vma->vm_start);
 		up_read(&current->mm->mmap_sem);
-		__D("get_phys: find_vma translated user %#lx to %#llx\n", virt,
-		    (unsigned long long)physp);
+		__D("get_phys: find_vma translated user %#lx to %pa\n", virt,
+		    &physp);
 		return(physp);
 	}
 
@@ -675,8 +675,8 @@ static phys_addr_t get_phys(void *virtp)
 
 		if (res == nr_pages) {
 			physp = __pa(page_address(&pages[0]) + (virt & ~PAGE_MASK));
-			__D("get_phys: get_user_pages translated user %#lx to %#llx\n",
-			    virt, (unsigned long long)physp);
+			__D("get_phys: get_user_pages translated user %#lx to %pa\n",
+			    virt, &physp);
 		} else {
 			__E("%s: Unable to find phys addr for %#lx\n",
 				__FUNCTION__, virt);
@@ -1445,6 +1445,7 @@ EXPORT_SYMBOL(cmem_dmabuf_export);
 static long ioctl(struct file *filp, unsigned int cmd, unsigned long args)
 {
 	unsigned int __user *argp = (unsigned int __user *) args;
+	unsigned long __user *largp = (unsigned long __user *) args;
 	unsigned long long __user *llargp = (unsigned long long __user *) args;
 	unsigned long virtArg;
 	unsigned long long physArg;
@@ -1593,12 +1594,12 @@ alloc:
 			}
 		}
 		else {
-			if (put_user(physp, llargp)) {
+			if (put_user((unsigned long long)physp, llargp)) {
 				return -EFAULT;
 			}
 		}
 
-		__D("ALLOCHEAP%s: allocated %#x size buffer at %#llx (phys address)\n",
+		__D("ALLOCHEAP%s: allocated %#zx size buffer at %llx (phys address)\n",
 		    cmd & CMEM_CACHED ? "CACHED" : "", (size_t)entry->size,
 		    (unsigned long long)entry->physp);
 
@@ -1699,7 +1700,7 @@ alloc:
 		    cmd & CMEM_PHYS ? "PHYS" : "");
 
 		if (!(cmd & CMEM_PHYS)) {
-			if (get_user(virtArg, argp)) {
+			if (get_user(virtArg, largp)) {
 				return -EFAULT;
 			}
 
@@ -1842,7 +1843,7 @@ alloc:
 				return -EFAULT;
 			}
 
-			__D("FREE%s%s: returning size 0x%x, poolid %d\n",
+			__D("FREE%s%s: returning size 0x%zx, poolid %d\n",
 			    cmd & CMEM_HEAP ? "HEAP" : "",
 			    cmd & CMEM_PHYS ? "PHYS" : "",
 			    allocDesc.free_outparams.size,
@@ -1857,7 +1858,7 @@ alloc:
 	 */
 	case CMEM_IOCGETPHYS:
 		__D("GETPHYS ioctl received.\n");
-		if (get_user(virtArg, argp)) {
+		if (get_user(virtArg, largp)) {
 			return -EFAULT;
 		}
 
