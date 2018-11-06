@@ -70,26 +70,26 @@ static void *allocPool(int blockid, int poolid, CMEM_AllocParams *params, off_t 
 static int validate_init()
 {
     switch (cmem_fd) {
-      case -3:
-	__E("CMEM_exit() already called, check stderr output for earlier "
-	    "CMEM failure messages (possibly version mismatch).\n");
+        case -3:
+            __E("CMEM_exit() already called, check stderr output for earlier "
+                "CMEM failure messages (possibly version mismatch).\n");
 
-	return 0;
+            return 0;
 
       case -2:
         __E("CMEM_init() not called, you must initialize CMEM before "
-	    "making API calls.\n");
+            "making API calls.\n");
 
-	return 0;
+        return 0;
 
       case -1:
         __E("CMEM file descriptor -1 (failed 'open()'), ensure CMEMK "
-	    "kernel module cmemk.ko has been installed with 'insmod'");
+            "kernel module cmemk.ko has been installed with 'insmod'");
 
-	return 0;
+        return 0;
 
       default:
-	return 1;
+        return 1;
     }
 }
 
@@ -101,10 +101,10 @@ int CMEM_init(void)
     __D("init: entered - ref_count %d, cmem_fd %d\n", ref_count, cmem_fd);
 
     if (cmem_fd >= 0) {
-	ref_count++;
-	__D("init: /dev/cmem already opened, incremented ref_count %d\n",
+        ref_count++;
+        __D("init: /dev/cmem already opened, incremented ref_count %d\n",
             ref_count);
-	return 0;
+        return 0;
     }
 
     cmem_fd = open("/dev/cmem", O_RDWR);
@@ -122,16 +122,16 @@ int CMEM_init(void)
     if ((version & 0xffff0000) != (CMEM_VERSION & 0xffff0000)) {
         __E("init: major version mismatch between interface and driver.\n");
         __E("    needs driver version %#x, got %#x\n", CMEM_VERSION, version);
-	CMEM_exit();
-	return -1;
+        CMEM_exit();
+        return -1;
     }
     else if ((version & 0x0000ffff) < (CMEM_VERSION & 0x0000ffff)) {
         __E("init: minor version mismatch between interface and driver.\n");
         __E("    needs driver minor version %#x or greater.\n"
-	    "    got minor version %#x (full version %#x)\n",
-	    CMEM_VERSION & 0x0000ffff, version & 0x0000ffff, version);
-	CMEM_exit();
-	return -1;
+            "    got minor version %#x (full version %#x)\n",
+            CMEM_VERSION & 0x0000ffff, version & 0x0000ffff, version);
+        CMEM_exit();
+        return -1;
     }
 
     __D("init: ... match good (%#x)\n", version);
@@ -169,11 +169,11 @@ static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params, of
     rv = ioctl(cmem_fd, cmd | CMEM_IOCMAGIC, &allocDesc);
     if (rv != 0) {
         __E("allocPool: ioctl %s failed from pool %d: %d\n",
-	    cmd == CMEM_IOCALLOC ? "CMEM_IOCALLOC" : "CMEM_IOCALLOCCACHED",
-	    poolid, rv);
-	if (physp) {
-	    *physp = (off_t)0;
-	}
+            cmd == CMEM_IOCALLOC ? "CMEM_IOCALLOC" : "CMEM_IOCALLOCCACHED",
+            poolid, rv);
+        if (physp) {
+            *physp = (off_t)0;
+        }
 
         return NULL;
     }
@@ -190,11 +190,11 @@ static void *allocFromPool(int blockid, int poolid, CMEM_AllocParams *params, of
     /* non-NULL physp means "don't map", return NULL since no virt ptr */
     if (physp) {
 #if defined(LINUXUTILS_BUILDOS_ANDROID)
-	*physp = (off_t)phys;
+        *physp = (off_t)phys;
 #else
-	*physp = phys;
+        *physp = phys;
 #endif
-	return NULL;
+        return NULL;
     }
 
     map_size = (size_t)size;
@@ -253,17 +253,17 @@ static void *getAndAllocFromPool(int blockid, unsigned long long size, CMEM_Allo
     poolid = CMEM_getPool2(blockid, size);
 
     if (poolid == -1) {
-	if (physp) {
-	    *physp = (off_t)0;
-	}
+        if (physp) {
+            *physp = (off_t)0;
+        }
 
-	return NULL;
+        return NULL;
     }
     if (poolid == -2) {
-	return allocFromHeap(blockid, (size_t)size, params, physp);
+        return allocFromHeap(blockid, (size_t)size, params, physp);
     }
     else {
-	return allocFromPool(blockid, poolid, params, physp);
+        return allocFromPool(blockid, poolid, params, physp);
     }
 }
 
@@ -288,12 +288,12 @@ static void *allocFromHeap(int blockid, size_t size, CMEM_AllocParams *params, o
     rv = ioctl(cmem_fd, cmd | CMEM_IOCMAGIC, &allocDesc);
     if (rv != 0) {
         __E("allocHeap: ioctl %s failed: %d\n",
-	    cmd == CMEM_IOCALLOCHEAP ?
-	           "CMEM_IOCALLOCHEAP" : "CMEM_IOCALLOCHEAPCACHED",
-	    rv);
-	if (physp) {
-	    *physp = (off_t)0;
-	}
+            cmd == CMEM_IOCALLOCHEAP ?
+                   "CMEM_IOCALLOCHEAP" : "CMEM_IOCALLOCHEAPCACHED",
+            rv);
+        if (physp) {
+            *physp = (off_t)0;
+        }
 
         return NULL;
     }
@@ -308,11 +308,11 @@ static void *allocFromHeap(int blockid, size_t size, CMEM_AllocParams *params, o
     /* non-NULL physp means "don't map", return NULL since no virt ptr */
     if (physp) {
 #if defined(LINUXUTILS_BUILDOS_ANDROID)
-	*physp = (off_t)phys;
+        *physp = (off_t)phys;
 #else
-	*physp = phys;
+        *physp = phys;
 #endif
-	return NULL;
+        return NULL;
     }
 
     /* Map the physical address to user space */
@@ -365,7 +365,7 @@ static void *allocFromHeap(int blockid, size_t size, CMEM_AllocParams *params, o
 static void *alloc(int blockid, size_t size, CMEM_AllocParams *params, off_t *physp)
 {
     if (params == NULL) {
-	params = &CMEM_DEFAULTPARAMS;
+        params = &CMEM_DEFAULTPARAMS;
     }
 
     __D("alloc: entered w/ size %#x, params - type %s, flags %s, align %#x%s\n",
@@ -376,18 +376,18 @@ static void *alloc(int blockid, size_t size, CMEM_AllocParams *params, off_t *ph
         params == &CMEM_DEFAULTPARAMS ? " (default)" : "");
 
     if (!validate_init()) {
-	if (physp) {
-	    *physp = (off_t)0;
-	}
+        if (physp) {
+            *physp = (off_t)0;
+        }
 
-	return NULL;
+        return NULL;
     }
 
     if (params->type == CMEM_POOL) {
-	return getAndAllocFromPool(blockid, (unsigned long long)size, params, physp);
+        return getAndAllocFromPool(blockid, (unsigned long long)size, params, physp);
     }
     else {
-	return allocFromHeap(blockid, size, params, physp);
+        return allocFromHeap(blockid, size, params, physp);
     }
 }
 
@@ -462,7 +462,7 @@ void *CMEM_registerAlloc64(off64_t physp)
     rv = ioctl(cmem_fd, CMEM_IOCREGUSER | CMEM_IOCMAGIC, &allocDesc);
     if (rv != 0) {
         __E("registerAlloc64: ioctl CMEM_IOCREGUSER failed for phys addr %#llx: %d\n",
-	    (unsigned long long)physp, rv);
+            (unsigned long long)physp, rv);
 
         return NULL;
     }
@@ -483,7 +483,7 @@ void *CMEM_registerAlloc64(off64_t physp)
         __E("registerAlloc64: Failed to mmap64 buffer at physical address %#llx\n",
             (unsigned long long)physp);
         __E("    Unregistering use of phys buffer %#llx\n",
-	    (unsigned long long)physp);
+            (unsigned long long)physp);
         ioctl(cmem_fd, CMEM_IOCFREEPHYS | CMEM_IOCMAGIC, &physp);
 
         return NULL;
@@ -528,7 +528,7 @@ off64_t CMEM_getPhys64(void *ptr)
     __D("getPhys64: entered w/ addr %p\n", ptr);
 
     if (!validate_init()) {
-	return 0;
+        return 0;
     }
 
     getDesc.virtp = ptr;
@@ -547,7 +547,7 @@ off64_t CMEM_getPhys64(void *ptr)
 int CMEM_freePhys64(off64_t physp, CMEM_AllocParams *params)
 {
     if (params == NULL) {
-	params = &CMEM_DEFAULTPARAMS;
+        params = &CMEM_DEFAULTPARAMS;
     }
 
     __D("freePhys64: entered w/ physical address %#llx, params - type %s%s\n",
@@ -556,14 +556,14 @@ int CMEM_freePhys64(off64_t physp, CMEM_AllocParams *params)
         params == &CMEM_DEFAULTPARAMS ? " (default)" : "");
 
     if (!validate_init()) {
-	return -1;
+        return -1;
     }
 
     if (ioctl(cmem_fd, CMEM_IOCFREEPHYS | CMEM_IOCMAGIC, &physp) != 0) {
-	__E("freePhys64: Failed to free buffer at physical address %#llx\n",
-	    (unsigned long long)physp);
+        __E("freePhys64: Failed to free buffer at physical address %#llx\n",
+            (unsigned long long)physp);
 
-	return -1;
+        return -1;
     }
 
     return 0;
@@ -582,7 +582,7 @@ void *CMEM_registerAlloc(off_t physp)
     rv = ioctl(cmem_fd, CMEM_IOCREGUSER | CMEM_IOCMAGIC, &allocDesc);
     if (rv != 0) {
         __E("registerAlloc: ioctl CMEM_IOCREGUSER failed for phys addr %#llx: %d\n",
-	    (unsigned long long)physp, rv);
+            (unsigned long long)physp, rv);
 
         return NULL;
     }
@@ -603,7 +603,7 @@ void *CMEM_registerAlloc(off_t physp)
         __E("registerAlloc: Failed to mmap buffer at physical address %#llx\n",
             (unsigned long long)physp);
         __E("    Unregistering use of phys buffer %#llx\n",
-	    (unsigned long long)physp);
+            (unsigned long long)physp);
         ioctl(cmem_fd, CMEM_IOCFREEPHYS | CMEM_IOCMAGIC, &physp);
 
         return NULL;
@@ -656,7 +656,7 @@ int CMEM_unmap(void *userp, size_t size)
 static void *allocPool(int blockid, int poolid, CMEM_AllocParams *params, off_t *physp)
 {
     if (params == NULL) {
-	params = &CMEM_DEFAULTPARAMS;
+        params = &CMEM_DEFAULTPARAMS;
     }
 
     __D("allocPool: entered w/ poolid %d, params - flags %s%s\n", poolid,
@@ -664,11 +664,11 @@ static void *allocPool(int blockid, int poolid, CMEM_AllocParams *params, off_t 
         params == &CMEM_DEFAULTPARAMS ? " (default)" : "");
 
     if (!validate_init()) {
-	if (physp) {
-	    *physp = (off_t)0;
-	}
+        if (physp) {
+            *physp = (off_t)0;
+        }
 
-	return NULL;
+        return NULL;
     }
 
     return allocFromPool(blockid, poolid, params, physp);
@@ -709,7 +709,7 @@ int CMEM_free(void *ptr, CMEM_AllocParams *params)
     size_t size;
 
     if (params == NULL) {
-	params = &CMEM_DEFAULTPARAMS;
+        params = &CMEM_DEFAULTPARAMS;
     }
 
     __D("free: entered w/ ptr %p, params - type %s%s\n",
@@ -718,7 +718,7 @@ int CMEM_free(void *ptr, CMEM_AllocParams *params)
         params == &CMEM_DEFAULTPARAMS ? " (default)" : "");
 
     if (!validate_init()) {
-	return -1;
+        return -1;
     }
 
     freeDesc.virtp = ptr;
@@ -745,7 +745,7 @@ int CMEM_free(void *ptr, CMEM_AllocParams *params)
 int CMEM_freePhys(off_t physp, CMEM_AllocParams *params)
 {
     if (params == NULL) {
-	params = &CMEM_DEFAULTPARAMS;
+        params = &CMEM_DEFAULTPARAMS;
     }
 
     __D("freePhys: entered w/ physical address %#llx, params - type %s%s\n",
@@ -754,14 +754,14 @@ int CMEM_freePhys(off_t physp, CMEM_AllocParams *params)
         params == &CMEM_DEFAULTPARAMS ? " (default)" : "");
 
     if (!validate_init()) {
-	return -1;
+        return -1;
     }
 
     if (ioctl(cmem_fd, CMEM_IOCFREEPHYS | CMEM_IOCMAGIC, &physp) == -1) {
-	__E("freePhys: Failed to free buffer at physical address %#llx\n",
-	    (unsigned long long)physp);
+        __E("freePhys: Failed to free buffer at physical address %#llx\n",
+            (unsigned long long)physp);
 
-	return -1;
+        return -1;
     }
 
     return 0;
@@ -802,7 +802,7 @@ static int getPoolFromBlock(int blockid, unsigned long long size)
     union CMEM_AllocUnion poolDesc;
 
     if (!validate_init()) {
-	return -1;
+        return -1;
     }
 
     poolDesc.get_pool_inparams.size = size;
@@ -839,7 +839,7 @@ off_t CMEM_getPhys(void *ptr)
     __D("getPhys: entered w/ addr %p\n", ptr);
 
     if (!validate_init()) {
-	return 0;
+        return 0;
     }
 
     getDesc.virtp = ptr;
@@ -860,7 +860,7 @@ int CMEM_cacheWbInvAll(void)
     __D("cacheWbInvAll: entered\n");
 
     if (!validate_init()) {
-	return -1;
+        return -1;
     }
 
     if (ioctl(cmem_fd, CMEM_IOCCACHEWBINVALL | CMEM_IOCMAGIC, NULL) == -1) {
@@ -881,7 +881,7 @@ int CMEM_cacheWb(void *ptr, size_t size)
     __D("cacheWb: entered w/ addr %p, size %#x\n", ptr, size);
 
     if (!validate_init()) {
-	return -1;
+        return -1;
     }
 
     block.addr = ptr;
@@ -904,7 +904,7 @@ int CMEM_cacheWbInv(void *ptr, size_t size)
     __D("cacheWbInv: entered w/ addr %p, size %#x\n", ptr, size);
 
     if (!validate_init()) {
-	return -1;
+        return -1;
     }
 
     block.addr = ptr;
@@ -928,7 +928,7 @@ int CMEM_cacheInv(void *ptr, size_t size)
     __D("cacheInv: entered w/ addr %p, size %#x\n", ptr, size);
 
     if (!validate_init()) {
-	return -1;
+        return -1;
     }
 
     block.addr = ptr;
@@ -952,14 +952,14 @@ int CMEM_getVersion(void)
     __D("getVersion: entered\n");
 
     if (!validate_init()) {
-	return -1;
+        return -1;
     }
 
     rv = ioctl(cmem_fd, CMEM_IOCGETVERSION | CMEM_IOCMAGIC, &version);
     if (rv != 0) {
-	__E("getVersion: Failed to retrieve version from driver: %d.\n", rv);
+        __E("getVersion: Failed to retrieve version from driver: %d.\n", rv);
 
-	return -1;
+        return -1;
     }
 
     __D("getVersion: exiting, ioctl CMEM_IOCGETVERSION returned %#x\n",
@@ -976,16 +976,16 @@ static int getBlock(int blockid, off_t *pphys_base, unsigned long long *psize)
     __D("getBlock: entered\n");
 
     if (!validate_init()) {
-	return -1;
+        return -1;
     }
 
     block.blockid = blockid;
     rv = ioctl(cmem_fd, CMEM_IOCGETBLOCK | CMEM_IOCMAGIC, &block);
     if (rv != 0) {
-	__E("getBlock: Failed to retrieve memory block bounds for block %d "
+        __E("getBlock: Failed to retrieve memory block bounds for block %d "
             "from driver: %d.\n", blockid, rv);
 
-	return -1;
+        return -1;
     }
 
     *pphys_base = (off_t)block.get_block_outparams.physp;
@@ -1015,15 +1015,15 @@ int CMEM_getNumBlocks(int *pnblocks)
     __D("getNumBlocks: entered\n");
 
     if (!validate_init()) {
-	return -1;
+        return -1;
     }
 
     rv = ioctl(cmem_fd, CMEM_IOCGETNUMBLOCKS | CMEM_IOCMAGIC, pnblocks);
     if (rv != 0) {
-	__E("getNumBlocks: Failed to retrieve number of blocks "
+        __E("getNumBlocks: Failed to retrieve number of blocks "
             "from driver: %d.\n", rv);
 
-	return -1;
+        return -1;
     }
 
     __D("getNumBlocks: exiting, ioctl CMEM_IOCGETNUMBLOCKS succeeded, "
@@ -1039,20 +1039,20 @@ int CMEM_exit(void)
     __D("exit: entered - ref_count %d, cmem_fd %d\n", ref_count, cmem_fd);
 
     if (!validate_init()) {
-	return -1;
+        return -1;
     }
 
     __D("exit: decrementing ref_count\n");
 
     ref_count--;
     if (ref_count == 0) {
-	result = close(cmem_fd);
+        result = close(cmem_fd);
 
-	__D("exit: ref_count == 0, closed /dev/cmem (%s)\n",
+        __D("exit: ref_count == 0, closed /dev/cmem (%s)\n",
             result == -1 ? strerror(errno) : "succeeded");
 
-	/* setting -3 allows to distinguish CMEM exit from CMEM failed */
-	cmem_fd = -3;
+        /* setting -3 allows to distinguish CMEM exit from CMEM failed */
+        cmem_fd = -3;
     }
 
     __D("exit: exiting, returning %d\n", result);
