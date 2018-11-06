@@ -652,16 +652,20 @@ int testAllocPhys(size_t size)
     map_ptr = CMEM_map64(physp, size);
 #else
     physp = CMEM_allocPhys(size, NULL);
-    map_ptr = CMEM_map(physp, size);
+    if (physp == 0) {
+        printf("testAllocPhys: CMEM_allocPhys failed\n");
+        goto cleanup;
+    }
+        map_ptr = CMEM_map(physp, size);
 #endif
     if (map_ptr == NULL) {
-	printf("testAllocPhys: CMEM_map() failed\n");
-	ret = 1;
-	goto cleanup;
+        printf("testAllocPhys: CMEM_map() failed\n");
+        ret = 1;
+        goto cleanup;
     }
     else {
-	printf("testAllocPhys: mapped physp %#llx to %p\n",
-		physp, map_ptr);
+        printf("testAllocPhys: mapped physp %#llx to %p\n",
+               physp, map_ptr);
     }
 
     printf("    writing 0xdadaface to *map_ptr\n");
@@ -669,8 +673,8 @@ int testAllocPhys(size_t size)
     printf("    *map_ptr = 0x%x\n", *map_ptr);
 
     if (*map_ptr != 0xdadaface) {
-	printf("testAllocPhys: failed, read didn't match write\n");
-	ret = 1;
+        printf("testAllocPhys: failed, read didn't match write\n");
+        ret = 1;
     }
 
     printf("    unmapping %p\n", map_ptr);
@@ -683,9 +687,9 @@ int testAllocPhys(size_t size)
     map_ptr = CMEM_map(physp, size * 0x10);
 #endif
     if (map_ptr != NULL) {
-	printf("testAllocPhys: CMEM_map() should've failed but didn't\n");
-	CMEM_unmap(map_ptr, size * 0x10);
-	ret = 1;
+        printf("testAllocPhys: CMEM_map() should've failed but didn't\n");
+        CMEM_unmap(map_ptr, size * 0x10);
+        ret = 1;
     }
 
 cleanup:
