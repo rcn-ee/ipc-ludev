@@ -1068,13 +1068,22 @@ static int cmem_seq_show(struct seq_file *s, void *v)
 
 static int cmem_proc_open(struct inode *inode, struct file *file);
 
-static struct file_operations cmem_proc_ops = {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0))
+static struct file_operations cmem_proc_fops = {
 	.owner = THIS_MODULE,
 	.open = cmem_proc_open,
 	.read = seq_read,
 	.llseek = seq_lseek,
 	.release = seq_release,
 };
+#else
+static struct proc_ops cmem_proc_ops = {
+	.proc_open = cmem_proc_open,
+	.proc_read = seq_read,
+	.proc_lseek = seq_lseek,
+	.proc_release = seq_release,
+};
+#endif
 
 static int cmem_proc_open(struct inode *inode, struct file *file)
 {
@@ -1211,6 +1220,7 @@ static void cmem_dma_buf_release(struct dma_buf *dma_buf)
 {
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0))
 static void *cmem_dma_buf_kmap(struct dma_buf *dmabuf, unsigned long offset)
 {
 	struct pool_buffer *entry = dmabuf->priv;
@@ -1225,6 +1235,7 @@ static void cmem_dma_buf_kunmap(struct dma_buf *dmabuf, unsigned long offset,
 			       void *ptr)
 {
 }
+#endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0))
 static int cmem_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
@@ -1389,8 +1400,10 @@ static const struct dma_buf_ops cmem_dmabuf_ops =  {
 	.map_atomic = cmem_dma_buf_kmap,
 	.unmap_atomic = cmem_dma_buf_kunmap,
 #endif
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0))
 	.map = cmem_dma_buf_kmap,
 	.unmap = cmem_dma_buf_kunmap,
+#endif
 #endif
 };
 
@@ -2911,8 +2924,11 @@ int __init cmem_init(void)
 	}
 
 	/* Create the /proc entry */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0))
+	cmem_proc_entry = proc_create("cmem", 0, NULL, &cmem_proc_fops);
+#else
 	cmem_proc_entry = proc_create("cmem", 0, NULL, &cmem_proc_ops);
-
+#endif
 	printk(KERN_INFO "cmemk initialized\n");
 
 	return 0;
