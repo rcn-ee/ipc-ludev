@@ -89,8 +89,7 @@ int main(int argc, char *argv[])
             goto cleanup;
         }
 
-        printf("virtual=%p physical=%zx\n", ptr,
-               physp);
+        printf("virtual=%p physical=%llx\n", ptr, (long long) physp);
 
         ptr += inc;
     }
@@ -107,8 +106,7 @@ int main(int argc, char *argv[])
             goto cleanup;
         }
 
-        printf("virtual=%p physical=%zx\n", ptr,
-               physp);
+        printf("virtual=%p physical=%llx\n", ptr, (long long) physp);
 
         ptr += inc;
     }
@@ -125,8 +123,7 @@ int main(int argc, char *argv[])
             goto cleanup;
         }
 
-        printf("virtual=%p physical=%zx\n", ptr,
-               physp);
+        printf("virtual=%p physical=%llx\n", ptr, (long long) physp);
 
         ptr += inc;
     }
@@ -143,8 +140,7 @@ int main(int argc, char *argv[])
             goto cleanup;
         }
 
-        printf("virtual=%p physical=%zx\n", ptr,
-               physp);
+        printf("virtual=%p physical=%llx\n", ptr, (long long) physp);
 
         ptr += inc;
     }

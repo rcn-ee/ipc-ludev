@@ -598,8 +598,8 @@ int testMap(size_t size)
 	goto cleanup;
     }
     else {
-	printf("testMap: remapped physp %#zx to %p\n",
-		physp, map_ptr);
+	printf("testMap: remapped physp %#llx to %p\n",
+		(long long)physp, map_ptr);
 	printf("    *map_ptr = 0x%x\n", *map_ptr);
     }
 
@@ -664,8 +664,8 @@ int testAllocPhys(size_t size)
         goto cleanup;
     }
     else {
-        printf("testAllocPhys: mapped physp %#zx to %p\n",
-               physp, map_ptr);
+        printf("testAllocPhys: mapped physp %#llx to %p\n",
+               (long long)physp, map_ptr);
     }
 
     printf("    writing 0xdadaface to *map_ptr\n");
