@@ -676,7 +676,10 @@ static phys_addr_t get_phys(void *virtp)
 		int res, nr_pages = 1;
 		struct page *pages;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0))
+		res = get_user_pages_remote(current->mm, virt, nr_pages,
+					    FOLL_WRITE, &pages, NULL, NULL);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0))
 		res = get_user_pages_remote(current, current->mm, virt, nr_pages,
 					    FOLL_WRITE, &pages, NULL, NULL);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
