@@ -625,12 +625,20 @@ void HeapMem_free(int bi, phys_addr_t block, size_t size)
 
 static inline void cmem_mmap_read_lock(struct mm_struct *mm)
 {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0))
 	down_read(&mm->mmap_sem);
+#else
+	mmap_read_lock(mm);
+#endif
 }
 
 static inline void cmem_mmap_read_unlock(struct mm_struct *mm)
 {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0))
 	up_read(&mm->mmap_sem);
+#else
+	mmap_read_unlock(mm);
+#endif
 }
 
 /* Traverses the page tables and translates a virtual address to a physical. */
