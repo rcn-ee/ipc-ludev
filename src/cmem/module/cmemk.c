@@ -623,6 +623,16 @@ void HeapMem_free(int bi, phys_addr_t block, size_t size)
 	unmap_header(newHeader);
 }
 
+static inline void cmem_mmap_read_lock(struct mm_struct *mm)
+{
+	down_read(&mm->mmap_sem);
+}
+
+static inline void cmem_mmap_read_unlock(struct mm_struct *mm)
+{
+	up_read(&mm->mmap_sem);
+}
+
 /* Traverses the page tables and translates a virtual address to a physical. */
 static phys_addr_t get_phys(void *virtp)
 {
@@ -639,7 +649,7 @@ static phys_addr_t get_phys(void *virtp)
 		return(physp);
 	}
 
-	down_read(&current->mm->mmap_sem);
+	cmem_mmap_read_lock(current->mm);
 	vma = find_vma(mm, virt);
 	/* this will catch, kernel-allocated, mmaped-to-usermode addresses */
 	if (vma  &&
@@ -647,7 +657,7 @@ static phys_addr_t get_phys(void *virtp)
 	    (vma->vm_pgoff)) {
 		physp = (((phys_addr_t)vma->vm_pgoff) << PAGE_SHIFT) +
 			(virt - vma->vm_start);
-		up_read(&current->mm->mmap_sem);
+		cmem_mmap_read_unlock(current->mm);
 		__D("get_phys: find_vma translated user %#lx to %pa\n", virt,
 		    &physp);
 		return(physp);
@@ -671,7 +681,7 @@ static phys_addr_t get_phys(void *virtp)
 		res = get_user_pages(current, current->mm, virt, nr_pages, 1, 0,
 				     &pages, NULL);
 #endif
-		up_read(&current->mm->mmap_sem);
+		cmem_mmap_read_unlock(current->mm);
 
 		if (res == nr_pages) {
 			physp = __pa(page_address(&pages[0]) + (virt & ~PAGE_MASK));
