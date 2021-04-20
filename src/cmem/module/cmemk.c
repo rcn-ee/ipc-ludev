@@ -16,9 +16,15 @@
 /*
  * cmemk.c
  */
+
+#include <linux/version.h>
 #include <linux/device.h>
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
 #include <linux/dma-mapping.h>
 #include <linux/dma-contiguous.h>
+#else
+#include <linux/dma-map-ops.h>
+#endif
 #include <linux/fs.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -37,8 +43,6 @@
 #include <asm/cacheflush.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
-
-#include <linux/version.h>
 
 #include <ti/cmem.h>
 
@@ -246,6 +250,11 @@ static struct device *cmem_cma_dev_0;
 #if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
 	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 #define KEYSTONE_DMA_PFN_OFFSET 0x780000UL
+
+/* definitions from arch/arm/mach-keystone/memory.h */
+#define KEYSTONE_LOW_PHYS_START         0x80000000ULL
+#define KEYSTONE_HIGH_PHYS_START        0x800000000ULL
+#define KEYSTONE_HIGH_PHYS_SIZE		0x400000000ULL	/* 16G */
 #endif
 
 #if IS_ENABLED(CONFIG_ARCH_K3)
@@ -2735,10 +2744,17 @@ fail:
 	return err;
 }
 
-static void __init cmem_dma_offset_configure(struct device *dev)
+static int __init cmem_dma_offset_configure(struct device *dev)
 {
 #if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
 	dev->dma_pfn_offset = KEYSTONE_DMA_PFN_OFFSET;
+	return 0;
+#else
+	return dma_direct_set_offset(dev, KEYSTONE_HIGH_PHYS_START,
+					KEYSTONE_LOW_PHYS_START,
+					KEYSTONE_HIGH_PHYS_SIZE);
+#endif
 #endif
 }
 
@@ -2794,7 +2810,11 @@ int __init cmem_init(void)
 				   NULL, "cmem");
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 	cmem_cma_dev_0->coherent_dma_mask = DMA_BIT_MASK(32);
-	cmem_dma_offset_configure(cmem_cma_dev_0);
+	err = cmem_dma_offset_configure(cmem_cma_dev_0);
+	if (err) {
+		__E("cmem_dma_offset_configure failed.\n");
+		goto fail_after_dma;
+	}
 #endif
 	for (bi = 0; bi < NBLOCKS; bi++) {
 		if (!block_start[bi] || !block_end[bi]) {
@@ -2974,6 +2994,9 @@ fail_after_create:
 		}
 	}
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
+fail_after_dma:
+#endif
 	device_destroy(cmem_class, MKDEV(cmem_major, 0));
 	class_destroy(cmem_class);
 
