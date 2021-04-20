@@ -2735,6 +2735,13 @@ fail:
 	return err;
 }
 
+static void __init cmem_dma_offset_configure(struct device *dev)
+{
+#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
+	dev->dma_pfn_offset = KEYSTONE_DMA_PFN_OFFSET;
+#endif
+}
+
 int __init cmem_init(void)
 {
 	int bi;
@@ -2787,9 +2794,7 @@ int __init cmem_init(void)
 				   NULL, "cmem");
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 	cmem_cma_dev_0->coherent_dma_mask = DMA_BIT_MASK(32);
-#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
-	cmem_cma_dev_0->dma_pfn_offset = KEYSTONE_DMA_PFN_OFFSET;
-#endif
+	cmem_dma_offset_configure(cmem_cma_dev_0);
 #endif
 	for (bi = 0; bi < NBLOCKS; bi++) {
 		if (!block_start[bi] || !block_end[bi]) {
@@ -2921,9 +2926,8 @@ int __init cmem_init(void)
 			p_objs[NBLOCKS][i].numbufs = cmem_cma_p_objs[i].numbufs;
 
 			cmem_cma_dev[i].coherent_dma_mask = DMA_BIT_MASK(32);
-#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE) \
-	&& (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
-			cmem_cma_dev[i].dma_pfn_offset = KEYSTONE_DMA_PFN_OFFSET;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
+			cmem_dma_offset_configure(&cmem_cma_dev[i]);
 #endif
 			__D("	pool %d: size=%#llx numbufs=%d\n", i,
 				p_objs[NBLOCKS][i].size, p_objs[NBLOCKS][i].numbufs);
