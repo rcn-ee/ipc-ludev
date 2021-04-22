@@ -2755,6 +2755,8 @@ static int __init cmem_dma_offset_configure(struct device *dev)
 					KEYSTONE_LOW_PHYS_START,
 					KEYSTONE_HIGH_PHYS_SIZE);
 #endif
+#else
+	return 0;
 #endif
 }
 
